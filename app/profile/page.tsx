@@ -19,13 +19,16 @@ import ColorFullAvatar from "@/components/common/ColorFullAvatar";
 const profileSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email"),
-  phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
+  phone_number: z.string().max(10, "Phone number must be at least 10 digits"),
   user_address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
   state_name: z.string().min(1, "State is required"),
-  pin_code: z.coerce.number().refine((val) => val > 0, {
-    message: "Pin code is required",
-  }),
+  pin_code: z
+  .string()
+  .min(6, { message: "Pin code must be 6 digits" })
+  .max(6, { message: "Pin code must be 6 digits" })
+  .regex(/^\d+$/, { message: "Pin code must contain only numbers" }),
+
   country: z.string().min(1, "Country is required"),
 });
 
@@ -34,17 +37,18 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 export default function Page() {
   const { user: authUser } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState("/default-avatar.png");
-
+  console.log("authUser",authUser);
+  
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       full_name: authUser?.displayName || "",
       email: authUser?.email || "",
-      phone_number: "",
-      user_address: "",
-      city: "",
-      state_name: "",
-      pin_code: undefined,
+      phone_number: authUser?.additionalData?.phone_number || "",
+      user_address: authUser?.additionalData?.user_address || "",
+      city: authUser?.additionalData?.city || "",
+      state_name: authUser?.additionalData?.state_name || "",
+      pin_code: authUser?.additionalData?.pin_code || "",
       country: "India",
     },
   });

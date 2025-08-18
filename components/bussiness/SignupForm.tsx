@@ -29,11 +29,12 @@ import { fi } from "zod/v4/locales";
 import { supabase } from "../admin/ProductForm";
 import { showToast } from "@/lib/sweetalert-theme";
 import { useGlobalLoading } from "../common/LoadingProvider";
+import { useUserDetails } from "@/hooks/useUserDetails";
 /* -------------------------------------------------- */
 const signupSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email"),
-  phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
+  // phone_number: z.string().max(10, "Phone number must be at least 10 digits"),
   password: z.string().min(6, "Password must be at least 6 chars"),
   // user_address: z.string().min(1, "Address is required"),
   // city: z.string().min(1, "City is required"),
@@ -62,8 +63,8 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
     mode: "onChange",
   });
   const { openModal, closeModal } = useModal();
-  const { mutate, isLoading, isError, error } = useCreateUser();
-
+  // const { mutate, isLoading, isError, error } = useCreateUser();
+  const { user, isLoading, error,isError, insertUser, updateUser } = useUserDetails();
   /* ---------- Get geolocation ---------- */
   const fetchLocation = () => {
     if (!navigator.geolocation)
@@ -87,10 +88,10 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
           email: data.email,
           password: data.password,
           options: {
-            emailRedirectTo: "http://localhost:3000/verify",
+            // emailRedirectTo: "http://localhost:3000/verify",
             data: {
               display_name: data.full_name,
-              phone_number: "+91" + data.phone_number, // Assuming phone number is in Indian format
+              //phone_number: data.phone_number, // Assuming phone number is in Indian format
             },
           },
         }
@@ -102,7 +103,8 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
       }
 
       const user_id = authResult.user?.id;
-
+      console.log(authResult);
+      
       if (!user_id) throw new Error("No user ID returned from Supabase");
       // mutate({
       //   userDetails: {
@@ -113,6 +115,17 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
       //     role: "USER",
       //   },
       // });
+       insertUser({
+        user_id,
+        full_name: data.full_name,
+        email: data.email,
+        role: "USER",
+      });
+      
+      if (error) {
+        console.error("Insert error:", error);
+        throw error;
+      }
       toast.success("Account created successfully!",{
         description: "Please check your email to verify your account.",
       });
@@ -153,7 +166,7 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
                   </p>
                 )}
               </div>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid  gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
                   <Input type="email" id="email" {...register("email")} />
@@ -163,7 +176,7 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
                     </p>
                   )}
                 </div>
-                <div className="grid gap-2">
+                {/* <div className="grid gap-2">
                   <Label htmlFor="phone">Phone</Label>
                   <Input id="phone" {...register("phone_number")} />
                   {errors.phone_number && (
@@ -171,7 +184,7 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
                       {errors.phone_number.message}
                     </p>
                   )}
-                </div>
+                </div> */}
               </div>
               {/* <Button
               variant="secondary"

@@ -35,3 +35,20 @@ export const getDiscountedPrice = (price: string, discount: number): number => {
   const discounted = numericPrice - (numericPrice * discount) / 100;
   return Math.round(discounted); // rounds up if .5 or higher
 };
+
+export function getFriendlyErrorMessage(error: any): string {
+  switch (error.code) {
+    case "23505":
+      if (error.message.includes("users_email_unique")) {
+        return "This email is already registered. Please use a different email.";
+      }
+      return "Duplicate value. Please use a different input.";
+    case "23503":
+      return "Invalid reference. Please check related data.";
+    case "23502":
+      return "Missing required field.";
+    default:
+      return error.message || "An unexpected error occurred.";
+  }
+}
+

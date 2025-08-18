@@ -18,11 +18,13 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useModal } from "@/app/context/ModalContext";
 import { toast } from "sonner";
-import { supabase } from "../admin/ProductForm";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import { AuthResponse } from "@/app/types/Auth";
 import { useGlobalLoading } from "../common/LoadingProvider";
+import { getFriendlyErrorMessage } from "@/lib/utils";
+import { useUserDetails } from "@/hooks/useUserDetails";
+import { supabase } from "@/lib/supabase-browser";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email"),
@@ -50,9 +52,8 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
     const currentUrl = `${pathname}?${searchParams.toString()}`;
     router.push(currentUrl);
   };
-
+  const { user, isLoading, isError, error, getUser, updateUser } = useUserDetails();
   async function onSubmit(data: LoginFormValues) {
-    console.log("Login data:", data);
     try {
       show();
       const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -71,21 +72,36 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
       if (!session) {
         throw new Error("Session not returned from Supabase");
       }
-
+  // ✅ Step 2: Write session to cookies so API routes can read it
+  // await supabase.auth.setSession({
+  //   access_token: session.access_token,
+  //   refresh_token: session.refresh_token,
+  // });
       // Optionally: Fetch additional user details if needed
       // const { user } = session;
       // const userId = user.id;
-      login(authData); // This will update context and sessionStorage
+      //  const { data: userDetails, error:uerror } = await supabase.from("users").select("*").eq("user_id", session.user.id).single();
+      // if (uerror) {
+      //   console.error("User details error:", error);
+      //   throw new Error("Failed to fetch user details");
+      // }
+      const userDetails = await getUser();
+      console.log("User details:", userDetails);
+      
+      login({...authData,isLoginnedIn:true,userDetails}); // This will update context and sessionStorage
       toast.success("Logged in successfully!");
 
       // Optional: Navigate to dashboard or home page
       handleRefresh();
+      closeModal();
+     hide();
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to log in");
-    } finally {
-      closeModal(); // If you're using a modal
-      hide(); // Hide loading state
+      toast.error(getFriendlyErrorMessage(err) ?? "Failed to log in");
     }
+    // finally {
+    //   closeModal(); // If you're using a modal
+    //   hide(); // Hide loading state
+    // }
   }
 
   return (

@@ -23,6 +23,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = (data: any) => {
+    console.log("data",data);
+    
     const authUser: AuthUser = {
       id: data.user.id,
       email: data.user.email,
@@ -30,6 +32,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       emailVerified: data.user.user_metadata.email_verified,
       phoneVerified: false, // Assuming phone verification is not handled here
       displayName: data.user.user_metadata.display_name || '', // Optional field
+      isLoginnedIn:data.isLoginnedIn||false,
+      additionalData:data.userDetails
     };
 
     setUser(authUser);

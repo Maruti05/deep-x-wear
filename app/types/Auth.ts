@@ -1,3 +1,5 @@
+import { User } from "./User";
+
 // types.ts
 export interface AuthUser {
   id: string;
@@ -6,6 +8,8 @@ export interface AuthUser {
   phoneVerified: boolean;
   role: string;
   displayName?: string; // Optional field for user's display name
+  isLoginnedIn: boolean;
+  additionalData?:User 
 }
 
 export interface AuthSession {

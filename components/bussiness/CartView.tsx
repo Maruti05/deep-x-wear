@@ -25,8 +25,11 @@ import { Separator } from "../ui/separator";
 import { Checkbox } from "../ui/checkbox";
 import { getDiscountedPrice } from "@/lib/utils";
 import { Badge } from "../ui/badge";
+import { useAuth } from "@/app/context/AuthContext";
+import CheckoutBanner from "./CheckoutBanner";
 
 export default function CartView() {
+  const { user: authUser } = useAuth();
   const { cart, updateCartItem, removeFromCart, clearCart } = useCart();
   const [selectedItems, setSelectedItems] = useState<boolean[]>(
     cart.map(() => true)
@@ -224,7 +227,7 @@ export default function CartView() {
               <span>₹{afterDiscAmount.toFixed(2)}</span>
             </div>
           </div>
-
+         <CheckoutBanner authUser={authUser}/>
           <Button
             className="mt-6 w-full flex items-center gap-2"
             disabled={afterDiscAmount === 0}
