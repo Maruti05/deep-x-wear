@@ -1,3 +1,4 @@
+import { AdditionalData } from "@/app/types/User";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -51,4 +52,33 @@ export function getFriendlyErrorMessage(error: any): string {
       return error.message || "An unexpected error occurred.";
   }
 }
+// helpers/verifyRequiredFields.ts
+
+type RequiredField = keyof Pick<
+  AdditionalData,
+  "phone_number" | "pin_code" | "state_name" | "user_address" | "city"
+>;
+
+export function verifyRequiredFieldsPresent(
+  additionalData?: AdditionalData | null
+): boolean {
+  // Defensive: Ensure object is valid
+  if (!additionalData || typeof additionalData !== "object") return false;
+
+  const requiredFields: RequiredField[] = [
+    "phone_number",
+    "pin_code",
+    "state_name",
+    "user_address",
+    "city",
+  ];
+
+  return requiredFields.every((field) => {
+    const rawValue = additionalData[field];
+    const value = String(rawValue ?? "").trim();
+
+    return value.length > 0;
+  });
+}
+
 

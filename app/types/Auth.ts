@@ -9,7 +9,8 @@ export interface AuthUser {
   role: string;
   displayName?: string; // Optional field for user's display name
   isLoginnedIn: boolean;
-  additionalData?:User 
+  additionalData?:User;
+  isProfileCompleted: boolean;
 }
 
 export interface AuthSession {
@@ -23,6 +24,7 @@ export interface AuthContextType {
   accessToken: string | null;
   login: (data: any) => void;
   logout: () => void;
+  updateAuth: (updates: Partial<AuthUser>) => void;
 }
 export interface AuthResponse {
   access_token: string;

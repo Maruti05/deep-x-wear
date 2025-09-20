@@ -9,7 +9,7 @@ import {
   Plus,
   HandCoins,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -23,18 +23,24 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Checkbox } from "../ui/checkbox";
-import { getDiscountedPrice } from "@/lib/utils";
+import { getDiscountedPrice, verifyRequiredFieldsPresent } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 import { useAuth } from "@/app/context/AuthContext";
 import CheckoutBanner from "./CheckoutBanner";
+import Link from "next/link";
+import Banner from "./CheckoutBanner";
+import { useModal } from "@/app/context/ModalContext";
+import { supabase } from "../admin/ProductForm";
 
 export default function CartView() {
+  const { openModal } = useModal();
   const { user: authUser } = useAuth();
   const { cart, updateCartItem, removeFromCart, clearCart } = useCart();
   const [selectedItems, setSelectedItems] = useState<boolean[]>(
     cart.map(() => true)
   );
   const [confirmClear, setConfirmClear] = useState(false);
+  console.log("isProfileComplete", authUser?.isProfileCompleted);
 
   const handleSelectChange = (index: number) => {
     const updated = [...selectedItems];
@@ -43,26 +49,113 @@ export default function CartView() {
   };
 
   const afterDiscAmount = cart.reduce((acc, item, i) => {
+    return selectedItems[i] ? acc + item.calculatedPrice * item.quantity : acc;
+  }, 0);
+  const totalAmount = cart.reduce((acc, item, i) => {
     return selectedItems[i]
-      ? acc + (item.calculatedPrice * item.quantity)
+      ? acc + parseFloat(item.price) * item.quantity
       : acc;
   }, 0);
- const totalAmount = cart.reduce((acc, item, i) => {
-    return selectedItems[i]
-      ? acc + parseFloat(item.price )* item.quantity
-      : acc;
-  }, 0);
+  const isDisabled =
+    afterDiscAmount === 0 ||
+    cart.length === 0 ||
+    !authUser?.isLoginnedIn ||
+    !authUser.isProfileCompleted;
+
+  // const handleClick = useCallback(
+
+  //   (e: React.MouseEvent) => {
+  //     if (isDisabled) {
+  //       e.preventDefault(); // 🛑 prevent link navigation
+  //       e.stopPropagation();
+  //     }else{
+  //       openModal("payment-confirm");
+  //     }
+  //   },
+  //   [isDisabled]
+  // );
+const onClickPlaceOrder = async () => {
+  if (isDisabled) return;
+
+  try {
+
+    // build order items payload
+    const selectedCartItems = cart.filter((_, i) => selectedItems[i]);
+
+    const subtotal = selectedCartItems.reduce(
+      (acc, item) => acc + item.calculatedPrice * item.quantity,
+      0
+    );
+
+    // Step 1: Insert Order
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        user_id: authUser.id,
+        order_number: `ORD-${Date.now()}`, // simple unique order number
+        subtotal,
+        total: subtotal, // add tax/shipping if needed
+        status: "pending",
+        payment_status: "pending",
+        notes: null,
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error(orderError);
+      toast.error("Failed to place order.");
+      return;
+    }
+
+    // Step 2: Insert Order Items
+    const orderItemsPayload = selectedCartItems.map((item) => ({
+      order_id: order.id,
+      product_id: item.productId,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color,
+      price: item.calculatedPrice,
+      product_snapshot: {
+        name: item.name,
+        price: item.price,
+        discount: item.discount,
+      },
+    }));
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .insert(orderItemsPayload);
+
+    if (itemsError) {
+      console.error(itemsError);
+      toast.error("Failed to add order items.");
+      return;
+    }
+
+    // ✅ Step 3: Open Payment Confirmation modal
+    openModal("payment-confirm", { order }); // pass order to modal
+    toast.success("Order created, please confirm payment.");
+  } catch (err) {
+    console.error(err);
+    toast.error("Something went wrong while placing the order.");
+  }
+};
   return (
-    <div  className={`grid gap-6 p-4 h-[calc(100vh-200px)] ${
-    cart.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
-  }`}>
+    <div
+      className={`grid gap-6 p-4 h-auto] ${
+        cart.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+      }`}
+    >
       {/* LEFT: Cart List */}
       <div>
         <div className="flex justify-between items-center mb-4">
-            {cart.length > 0 &&<h2 className="text-xl font-semibold flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Cart Summary
-          </h2>}
+          {cart.length > 0 && (
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5" />
+              Cart Summary
+            </h2>
+          )}
 
           {cart.length > 0 && (
             <Dialog open={confirmClear} onOpenChange={setConfirmClear}>
@@ -104,7 +197,7 @@ export default function CartView() {
           )}
         </div>
 
-     {cart.length > 0 &&   <Separator />}
+        {cart.length > 0 && <Separator />}
 
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)] text-center text-muted-foreground">
@@ -138,7 +231,6 @@ export default function CartView() {
                     Size: {item.size} | Color: {item.color}
                   </p>
                   <div className="flex items-center gap-2">
-                    
                     {item.price && item.discount && (
                       <p className="text-2sl font-semibold">
                         ₹
@@ -215,26 +307,46 @@ export default function CartView() {
               <span>Shipping</span>
               <span>Free</span>
             </div>
-             <div className="flex justify-between">
+            <div className="flex justify-between">
               <span>You saved</span>
               <Badge variant="success" className="flex items-center gap-1">
-                  <HandCoins className="h-3 w-auto"/>
-                {(totalAmount-afterDiscAmount).toFixed(2)}
-                </Badge>
+                <HandCoins className="h-3 w-auto" />
+                {(totalAmount - afterDiscAmount).toFixed(2)}
+              </Badge>
             </div>
             <div className="flex justify-between font-semibold border-t pt-2">
               <span>Total</span>
               <span>₹{afterDiscAmount.toFixed(2)}</span>
             </div>
           </div>
-         <CheckoutBanner authUser={authUser}/>
-          <Button
-            className="mt-6 w-full flex items-center gap-2"
-            disabled={afterDiscAmount === 0}
-          >
-            <PackageCheck className="w-4 h-4" />
-            Place Order
-          </Button>
+          {authUser?.isLoginnedIn ? (
+            !authUser.isProfileCompleted && <Banner />
+          ) : (
+            <Banner
+              title="Login Required"
+              description="You need to be logged in to access this page."
+              linkHref="/login"
+              linkText="Login Now"
+              variant="info"
+              onClick={() => openModal("login")}
+            />
+          )}
+          {/* <Link
+            href={{
+              pathname: "/payment",
+              query: { amount: afterDiscAmount.toFixed(2) },
+            }}
+            onClick={handleClick}
+          > */}
+            <Button
+              className="mt-6 w-full flex items-center gap-2"
+              disabled={isDisabled}
+               onClick={onClickPlaceOrder}
+            >
+              <PackageCheck className="w-4 h-4" />
+              Place Order
+            </Button>
+          {/* </Link> */}
         </div>
       )}
     </div>

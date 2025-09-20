@@ -11,6 +11,7 @@ export async function middleware(req: NextRequest) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
+console.log("Session data1:", session);
 
   // If no session → redirect to login
   if (!session?.user) {
@@ -19,6 +20,8 @@ export async function middleware(req: NextRequest) {
 
   // Example role check (if you stored `role` in JWT or DB)
   if (req.nextUrl.pathname.startsWith("/admin")) {
+    console.log("Checking admin access for user:", session);
+    
     const role = (session.user.user_metadata?.role ?? "user") as string;
     if (role !== "admin") {
       return NextResponse.redirect(new URL("/forbidden", req.url));

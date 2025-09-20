@@ -260,11 +260,10 @@ async function uploadImage(file: File): Promise<string> {
             {[
               { name: "Black", code: "#000000" },
               { name: "White", code: "#FFFFFF" },
-              { name: "Red", code: "#FF0000" },
-              { name: "Blue", code: "#0000FF" },
-              { name: "Green", code: "#008000" },
+              { name: "Beige", code: "#F5F5DC" },
+              { name: "Lilac", code: "#CCCCFF" },
               { name: "Yellow", code: "#FFFF00" },
-              { name: "Purple", code: "#800080" },
+              { name: "Navy blue", code: "#000080" },
               { name: "Gray", code: "#808080" },
               { name: "Orange", code: "#d25625" }
             ].map((color) => {

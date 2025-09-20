@@ -22,9 +22,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import { AuthResponse } from "@/app/types/Auth";
 import { useGlobalLoading } from "../common/LoadingProvider";
-import { getFriendlyErrorMessage } from "@/lib/utils";
+import {
+  getFriendlyErrorMessage,
+  verifyRequiredFieldsPresent,
+} from "@/lib/utils";
 import { useUserDetails } from "@/hooks/useUserDetails";
 import { supabase } from "@/lib/supabase-browser";
+import { AdditionalData } from "@/app/types/User";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email"),
@@ -52,7 +56,8 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
     const currentUrl = `${pathname}?${searchParams.toString()}`;
     router.push(currentUrl);
   };
-  const { user, isLoading, isError, error, getUser, updateUser } = useUserDetails();
+  const { user, isLoading, isError, error, getUser, updateUser } =
+    useUserDetails();
   async function onSubmit(data: LoginFormValues) {
     try {
       show();
@@ -65,18 +70,18 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
         console.error("Login error:", error);
         throw new Error("Invalid email or password");
       }
-    
+
       const session = authData.session;
       console.log("Session data:", session);
 
       if (!session) {
         throw new Error("Session not returned from Supabase");
       }
-  // ✅ Step 2: Write session to cookies so API routes can read it
-  // await supabase.auth.setSession({
-  //   access_token: session.access_token,
-  //   refresh_token: session.refresh_token,
-  // });
+      // ✅ Step 2: Write session to cookies so API routes can read it
+      // await supabase.auth.setSession({
+      //   access_token: session.access_token,
+      //   refresh_token: session.refresh_token,
+      // });
       // Optionally: Fetch additional user details if needed
       // const { user } = session;
       // const userId = user.id;
@@ -87,14 +92,21 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
       // }
       const userDetails = await getUser();
       console.log("User details:", userDetails);
-      
-      login({...authData,isLoginnedIn:true,userDetails}); // This will update context and sessionStorage
+
+      login({
+        ...authData,
+        isLoginnedIn: true,
+        userDetails,
+        isProfileCompleted: verifyRequiredFieldsPresent(
+          userDetails as AdditionalData
+        ),
+      }); // This will update context and sessionStorage
       toast.success("Logged in successfully!");
 
       // Optional: Navigate to dashboard or home page
       handleRefresh();
       closeModal();
-     hide();
+      hide();
     } catch (err: any) {
       toast.error(getFriendlyErrorMessage(err) ?? "Failed to log in");
     }

@@ -32,6 +32,8 @@ import { Badge } from "../ui/badge";
 import { useAuth } from "@/app/context/AuthContext";
 import ColorFullAvatar from "./ColorFullAvatar";
 import ProductSearch from "../bussiness/ProductSearch";
+import Image from "next/image";
+import { BrandLogo } from "./BrandLogo";
 
 export interface NavItem {
   name: string;
@@ -72,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { accessToken, user: authUser, logout } = useAuth();
   console.log("Header user:", authUser, accessToken);
 
-  const isAuthenticated = authUser?.role === "authenticated";
+  const isAuthenticated = authUser?.isLoginnedIn;
   console.log("Is Authenticated:", isAuthenticated);
 
   return (
@@ -80,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         {/* Logo / Brand */}
         <Link href="/" className="text-xl font-bold tracking-tight">
-          {APP_NAME}
+          <BrandLogo/>
         </Link>
         <div className="flex-1 max-w-lg hidden md:block">
           <ProductSearch />
@@ -100,7 +102,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right side */}
         <div className="flex items-center gap-4">
-          
           <div className="block md:hidden">
             <ProductSearch />
           </div>

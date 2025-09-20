@@ -37,7 +37,7 @@ export async function updateUser(userId: string, updates: Record<string, any>) {
   const { data, error } = await supabase
     .from("users")
     .update(updates)
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   if (error) throw new Error(error.message);

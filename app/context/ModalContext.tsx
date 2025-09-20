@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useState } from "react";
 
-type ModalName = "login" | "signup" | null;
+type ModalName = "login" | "signup" | "payment-confirm" | null;
 
 interface ModalContextType {
   modal: ModalName;
-  openModal: (name: ModalName) => void;
+  modalProps: any;
+  openModal: (name: ModalName, props?: any) => void;
   closeModal: () => void;
 }
 
@@ -14,12 +15,20 @@ const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 export function ModalProvider({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ModalName>(null);
+  const [modalProps, setModalProps] = useState<any>(null);
 
-  const openModal = (name: ModalName) => setModal(name);
-  const closeModal = () => setModal(null);
+  const openModal = (name: ModalName, props: any = null) => {
+    setModal(name);
+    setModalProps(props);
+  };
+
+  const closeModal = () => {
+    setModal(null);
+    setModalProps(null);
+  };
 
   return (
-    <ModalContext.Provider value={{ modal, openModal, closeModal }}>
+    <ModalContext.Provider value={{ modal, modalProps, openModal, closeModal }}>
       {children}
     </ModalContext.Provider>
   );

@@ -11,3 +11,12 @@ export interface User {
     pin_code?: string; // Optional field for user's pin code
     user_id?: string; // Optional field for user's ID
 }
+
+export type AdditionalData = {
+  phone_number?: string | null;
+  pin_code?: string | null;
+  state_name?: string | null;
+  user_address?: string | null;
+  city?: string | null;
+  [key: string]: any;
+};

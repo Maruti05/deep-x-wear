@@ -13,7 +13,7 @@ interface RoleGuardProps {
 export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const { user } = useAuth();
   const router = useRouter();
-
+    console.log("Checking user role:", user);
   useEffect(() => {
     // Wait for auth to load
     if (!user) {
@@ -22,6 +22,8 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
     }
 
     // Check role
+
+    
     if (!allowedRoles.includes(user.role)) {
       router.replace("/403"); // forbidden page
     }
