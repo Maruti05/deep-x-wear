@@ -25,6 +25,7 @@ export interface AuthContextType {
   login: (data: any) => void;
   logout: () => void;
   updateAuth: (updates: Partial<AuthUser>) => void;
+  isLoading: boolean;
 }
 export interface AuthResponse {
   access_token: string;

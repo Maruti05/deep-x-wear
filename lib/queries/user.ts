@@ -1,6 +1,4 @@
 // queries/users.ts
-
-import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "../supabase-server";
 
 

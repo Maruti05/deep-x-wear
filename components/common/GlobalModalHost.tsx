@@ -3,7 +3,6 @@
 import { useModal } from "@/app/context/ModalContext";
 import { LoginPopup } from "../bussiness/LoginPopup";
 import SignupForm from "../bussiness/SignupForm";
-import PaymentPage from "@/app/payment/page";
 import ConfirmPayment from "../bussiness/ConfirmPayment";
 
 export function GlobalModalHost() {

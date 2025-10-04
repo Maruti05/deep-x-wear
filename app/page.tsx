@@ -22,7 +22,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen px-2 pb-20 pt-4 sm:px-8 sm:pt-12 font-[family-name:var(--font-geist-sans)]">
     {  products&&<ResponsiveCarouselWithDots
-        items={products.map((item: ProductType) => item.mainImageUrl)}
+        items={products.filter((i:ProductType)=>i.is_trendy).map((item: ProductType) => item.mainImageUrl)}
       />}
       <main className="container mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 auto-rows-fr mt-4">
         {products &&

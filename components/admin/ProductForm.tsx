@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch"; // 1. Import Switch
 import { Select, SelectTrigger, SelectContent, SelectValue, SelectItem } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, UploadCloud, X } from "lucide-react";
@@ -27,6 +28,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /* --------------------------------------------------------------------- */
+// 2. Add is_trendy to the Zod schema
 const createProductSchema = (isEditing: boolean) => z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
@@ -40,6 +42,7 @@ const createProductSchema = (isEditing: boolean) => z.object({
     code: z.string()
   })).min(1, "Select at least one color"),
   sizes: z.array(z.enum(["S", "M", "L", "XL", "XXL", "XXXL"])).min(1, "Select at least one size"),
+  is_trendy: z.boolean().optional(), // Added field
   main_image_url: z.string().optional(),
   imageFile: isEditing
     ? z.instanceof(File).optional()
@@ -53,7 +56,8 @@ export function ProductForm({
   onSaved,
   categories
 }: {
-  product?: Row | null;
+  // Assuming 'Row' type might include is_trendy
+  product?: (Row & { is_trendy?: boolean }) | null;
   onSaved?: () => void;
   categories?: { id: string; name: string }[];
 }) {
@@ -66,6 +70,7 @@ export function ProductForm({
   } = useForm<ProductFormValues>({
     resolver: zodResolver(createProductSchema(!!product)),
     mode: "onTouched",
+    // 3. Set default value for is_trendy
     defaultValues: product ? {
       name: product.name,
       description: product.description,
@@ -76,55 +81,52 @@ export function ProductForm({
       category_id: product.category_id,
       colors: product.colors,
       sizes: product.sizes as ("S" | "M" | "L" | "XL" | "XXL" | "XXXL")[],
+      is_trendy: product.is_trendy ?? false, // Handle existing product
       main_image_url: product.main_image_url,
-    } : undefined
+    } : {
+      is_trendy: false, // Default for new product
+    }
   });
-const { show, hide } = useGlobalLoading();
+
+  const { show, hide } = useGlobalLoading();
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-  const imageFile = watch("imageFile");
 
-async function uploadImage(file: File): Promise<string> {
-  const ext = file.name.split(".").pop();
-  const uuid = crypto.randomUUID();
+  async function uploadImage(file: File): Promise<string> {
+    const ext = file.name.split(".").pop();
+    const uuid = crypto.randomUUID();
+    const path = `product-images/prod-${uuid}.${ext}`;
 
-  // 👇 Store inside folder 'product-images/' in bucket 'url-blob'
-  const path = `product-images/prod-${uuid}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("url-blob")
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
 
-  // 👇 Upload file to bucket 'url-blob'
-  const { error: uploadError } = await supabase.storage
-    .from("url-blob")
-    .upload(path, file, {
-      cacheControl: "3600",
-      upsert: true,
-    });
+    if (uploadError) throw uploadError;
 
-  if (uploadError) throw uploadError;
+    const { data: publicUrlData } = supabase.storage
+      .from("url-blob")
+      .getPublicUrl(path);
 
-  // 👇 Get public URL of uploaded file
-  const { data: publicUrlData } = supabase.storage
-    .from("url-blob")
-    .getPublicUrl(path);
+    if (!publicUrlData || !publicUrlData.publicUrl) throw new Error("Failed to get public URL");
 
-  if (!publicUrlData || !publicUrlData.publicUrl) throw new Error("Failed to get public URL");
+    return publicUrlData.publicUrl;
+  }
 
-  return publicUrlData.publicUrl;
-}
-
-  console.log("errorMsg",errors,isValid);
-  
   const onSubmit = async (data: ProductFormValues) => {
     setLoading(true);
     setErrorMsg(null);
     show();
     try {
-      // Only upload new image if file is provided
       let finalImageUrl = product?.main_image_url;
       if (data.imageFile instanceof File) {
         finalImageUrl = await uploadImage(data.imageFile);
         setValue("main_image_url", finalImageUrl);
       }
-
+      
+      // 5. Add is_trendy to the data object for submission
       const productData = {
         name: data.name,
         description: data.description,
@@ -134,26 +136,24 @@ async function uploadImage(file: File): Promise<string> {
         remaining_quantity: data.remaining_quantity,
         sizes: data.sizes,
         colors: data.colors,
+        is_trendy: data.is_trendy ?? false, // Ensure it's a boolean
         main_image_url: finalImageUrl,
         category_id: data.category_id,
         slug: slugify(data.name),
       };
 
       if (product?.id) {
-        // Update existing product
         await supabase
           .from("products")
           .update(productData)
           .eq('id', product.id);
         toast.success("Product updated successfully");
       } else {
-        // Create new product
         await supabase
           .from("products")
           .insert(productData);
         toast.success("Product created successfully");
       }
-      onSaved?.();
       onSaved?.();
     } catch (err: any) {
       setErrorMsg(err.message ?? "Upload failed");
@@ -166,10 +166,7 @@ async function uploadImage(file: File): Promise<string> {
 
   return (
     <Card className="max-w-2xl mx-auto border-none">
-      {/* <CardHeader>
-        <CardTitle>Add / Edit Product</CardTitle>
-      </CardHeader> */}
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
         {errorMsg && (
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>
@@ -229,7 +226,7 @@ async function uploadImage(file: File): Promise<string> {
             {(["S", "M", "L", "XL", "XXL", "XXXL"] as const).map((size) => {
               const selectedSizes = watch("sizes") || [];
               const isSelected = selectedSizes.includes(size);
-              
+
               return (
                 <div
                   key={size}
@@ -269,7 +266,7 @@ async function uploadImage(file: File): Promise<string> {
             ].map((color) => {
               const selectedColors = watch("colors") || [];
               const isSelected = selectedColors.some(c => c.code === color.code);
-              
+
               return (
                 <div
                   key={color.code}
@@ -284,7 +281,7 @@ async function uploadImage(file: File): Promise<string> {
                     isSelected ? "border-primary" : "border-secondary"
                   )}
                 >
-                  <div 
+                  <div
                     className="w-6 h-6 rounded-full border border-gray-200"
                     style={{ backgroundColor: color.code }}
                   />
@@ -295,18 +292,33 @@ async function uploadImage(file: File): Promise<string> {
           </div>
           {errors.colors && <p className="text-sm text-red-600">{errors.colors.message}</p>}
         </div>
+
+        {/* 4. Add the Switch component for the 'is_trendy' field */}
+        <div className="flex items-center space-x-2 pt-2">
+          <Switch
+            id="is-trendy"
+            checked={watch("is_trendy")}
+            onCheckedChange={(checked) => {
+              setValue("is_trendy", checked);
+            }}
+          />
+          <Label htmlFor="is-trendy" className="cursor-pointer">
+            Mark as a Trendy Product ✨
+          </Label>
+        </div>
+
         {/* Image upload */}
         <div className="grid gap-2">
           <Label>Product Image</Label>
-          <Input 
-            type="file" 
-            accept="image/*" 
+          <Input
+            type="file"
+            accept="image/*"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
                 setValue("imageFile", file, { shouldValidate: true });
               }
-            }} 
+            }}
           />
           {errors.imageFile && <p className="text-sm text-red-600">{errors.imageFile.message as string}</p>}
         </div>

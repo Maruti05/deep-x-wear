@@ -1,4 +1,3 @@
-// components/RoleGuard.tsx
 "use client";
 
 import { useAuth } from "@/app/context/AuthContext";
@@ -11,25 +10,40 @@ interface RoleGuardProps {
 }
 
 export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth(); // add isLoading if possible
   const router = useRouter();
-    console.log("Checking user role:", user);
+
   useEffect(() => {
-    // Wait for auth to load
+    if (isLoading) return; // wait until auth finishes loading
+
     if (!user) {
-      router.replace("/login"); // not logged in
+      router.replace("/login"); // Redirect to login if not authenticated
       return;
     }
 
-    // Check role
+    const role = user.additionalData?.role || user.role;
+    console.log("Current user role:", role); // Debug log
 
-    
-    if (!allowedRoles.includes(user.role)) {
+    if (!allowedRoles.includes(role)) {
+      console.log("Access denied. Allowed roles:", allowedRoles); // Debug log
       router.replace("/403"); // forbidden page
     }
-  }, [user, router, allowedRoles]);
+  }, [user, isLoading, router, allowedRoles]);
 
-  if (!user) return null; // or loading spinner
+  if (isLoading) {
+    return <p>Loading...</p>; // show a loader while fetching
+  }
 
-  return <>{allowedRoles.includes(user.role) && children}</>;
+  if (!user) {
+    return null; // Don't render anything if not authenticated
+  }
+
+  const role = user.additionalData?.role || user.role;
+  console.log("Rendering check - User role:", role, "Allowed roles:", allowedRoles);
+  
+  if (!allowedRoles.includes(role)) {
+    return null; // prevent flash of unauthorized content
+  }
+
+  return <>{children}</>;
 }

@@ -9,7 +9,7 @@ import {
   Plus,
   HandCoins,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -23,14 +23,13 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Checkbox } from "../ui/checkbox";
-import { getDiscountedPrice, verifyRequiredFieldsPresent } from "@/lib/utils";
+import { getDiscountedPrice } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 import { useAuth } from "@/app/context/AuthContext";
-import CheckoutBanner from "./CheckoutBanner";
-import Link from "next/link";
 import Banner from "./CheckoutBanner";
 import { useModal } from "@/app/context/ModalContext";
 import { supabase } from "../admin/ProductForm";
+import PayButton from "../common/PayButton";
 
 export default function CartView() {
   const { openModal } = useModal();
@@ -338,14 +337,16 @@ const onClickPlaceOrder = async () => {
             }}
             onClick={handleClick}
           > */}
-            <Button
+            {/* <Button
               className="mt-6 w-full flex items-center gap-2"
               disabled={isDisabled}
                onClick={onClickPlaceOrder}
             >
               <PackageCheck className="w-4 h-4" />
               Place Order
-            </Button>
+            </Button> */}
+           <PayButton cart={cart.map(item => ({ ...item, price: Number(item.price) }))} selectedItems={selectedItems} />
+
           {/* </Link> */}
         </div>
       )}

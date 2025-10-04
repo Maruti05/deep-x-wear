@@ -45,7 +45,7 @@ export const products = pgTable('products', {
   // Status
   isActive: boolean('is_active').default(true),
   isFeatured: boolean('is_featured').default(false),
-  
+   is_trendy: boolean('is_trendy').default(false),
   // SEO
   metaTitle: text('meta_title'),
   metaDescription: text('meta_description'),

@@ -24,6 +24,7 @@ id: string;
   createdAt: string;
   updatedAt: string;
   calculatedPrice: number;
+  is_trendy: boolean
 }
 export interface ProductCardType extends ProductType {
   item?: ProductType;

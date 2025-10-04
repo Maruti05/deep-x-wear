@@ -23,6 +23,7 @@ export type Row = {
   colors: { name: string; code: string; }[];
   sizes: string[];
   main_image_url: string;
+  is_Trendy: boolean;
 };
 
 

@@ -1,21 +1,42 @@
-// app/orders/page.tsx
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Package, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useGlobalLoading } from "@/components/common/LoadingProvider";
 
 interface Order {
   id: string;
-  date: string;
+  created_at: string;
   items: string[];
   total: number;
+  order_number: string;
+  payment_status: string;
 }
 
 export default function Page() {
-  // Example: replace with real data from API
-  const [orders] = useState<Order[]>([]);
+  const { show, hide } = useGlobalLoading();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    async function fetchOrders() {
+      if (!user?.id) return;
+      show();
+      try {
+        const res = await fetch(`/api/orders/history?user_id=${user.id}`);
+        const data = await res.json();
+        if (data.orders) setOrders(data.orders);
+      } catch (err) {
+        console.error("fetchOrders error:", err);
+      } finally {
+        hide();
+      }
+    }
+    fetchOrders();
+  }, [user]);
 
   return (
     <div className="flex justify-center p-4">
@@ -36,7 +57,7 @@ export default function Page() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Looks like you haven’t bought anything yet. Start shopping now!
                 </p>
-                <Button onClick={() => window.location.href = "/"}>
+                <Button onClick={() => (window.location.href = "/")}>
                   Browse T-Shirts
                 </Button>
               </div>
@@ -45,14 +66,31 @@ export default function Page() {
                 {orders.map((order) => (
                   <Card key={order.id} className="border border-border">
                     <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                      <p className="font-semibold">Order #{order.id}</p>
-                      <span className="text-sm text-muted-foreground">{order.date}</span>
+                      <div>
+                        <p className="font-semibold">Order #{order.order_number}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Status:{" "}
+                          <span
+                            className={
+                              order.payment_status === "paid"
+                                ? "text-green-600"
+                                : "text-yellow-600"
+                            }
+                          >
+                            {order.payment_status}
+                          </span>
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </span>
                     </CardHeader>
                     <CardContent>
                       <ul className="list-disc list-inside text-sm sm:text-base mb-2">
-                        {order.items.map((item, i) => (
-                          <li key={i}>{item}</li>
-                        ))}
+                        {Array.isArray(order.items) &&
+                          order.items.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
                       </ul>
                       <p className="font-semibold">Total: ₹{order.total}</p>
                     </CardContent>
