@@ -2,34 +2,42 @@ import { db } from "@/lib/db";
 import { orderPayments, refunds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { CashfreeAPI } from "@/lib/payments/cashfree";
 
 export async function POST(req: Request) {
-  const { paymentId, amount, reason } = await req.json();
-  const [payment] = await db.select().from(orderPayments).where(eq(orderPayments.id, paymentId));
+  try {
+    const { paymentId, amount, reason } = await req.json();
+    if (!paymentId || !amount) {
+      return NextResponse.json({ error: "Missing paymentId or amount" }, { status: 400 });
+    }
 
-  const res = await fetch(`https://sandbox.cashfree.com/pg/refunds`, {
-    method: "POST",
-    headers: {
-      "x-client-id": process.env.CASHFREE_CLIENT_ID!,
-      "x-client-secret": process.env.CASHFREE_CLIENT_SECRET!,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      refund_amount: amount,
-      refund_note: reason,
-      order_id: payment.payment_ref,
-    }),
-  });
+    const [payment] = await db.select().from(orderPayments).where(eq(orderPayments.id, paymentId));
+    if (!payment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    }
 
-  const data = await res.json();
+    if (!payment.payment_ref) {
+      return NextResponse.json({ error: "Payment reference not found" }, { status: 400 });
+    }
+    const data = await CashfreeAPI.refundOrder(payment.payment_ref, Number(amount), reason);
 
-  await db.insert(refunds).values({
-    payment_id: paymentId,
-    amount,
-    reason,
-    refund_ref: data.refund_id,
-    status: "pending",
-  });
+    await db.insert(refunds).values({
+      payment_id: paymentId,
+      amount,
+      reason,
+      refund_ref: data.refund_id,
+      status: "pending",
+      // store full payload for audit
+      // @ts-ignore
+      // drizzle jsonb will accept generic object
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (err: any) {
+    console.error("/api/refunds error:", err?.data || err?.message || err);
+    const status = err?.status || 500;
+    return NextResponse.json({ error: err?.data || err?.message || "Refund initiation failed" }, { status });
+  }
 }

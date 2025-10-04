@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { orders, orderPayments } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { CashfreeAPI } from "@/lib/payments/cashfree";
 
 export async function GET(req: Request) {
   try {
@@ -7,39 +10,25 @@ export async function GET(req: Request) {
     const orderId = url.searchParams.get("order_id");
 
     if (!orderId) {
-      // Redirect to failure page with error message
       return NextResponse.redirect(new URL(`/payment/failure?error=Missing+order+ID`, req.url));
     }
 
-    const res = await fetch(`https://sandbox.cashfree.com/pg/orders/${orderId}`, {
-      headers: {
-        "x-client-id": process.env.CASHFREE_CLIENT_ID!,
-        "x-client-secret": process.env.CASHFREE_CLIENT_SECRET!,
-        "x-api-version": "2022-09-01",
-      },
-    });
+    const data = await CashfreeAPI.getOrder(orderId);
 
-    if (!res.ok) {
-      // Handle API error
-      const errorData = await res.json();
-      console.error("Payment verification error:", errorData);
-      return NextResponse.redirect(new URL(`/payment/failure?order_id=${orderId}&error=Payment+verification+failed`, req.url));
-    }
-
-    const data = await res.json();
-    
-    // Check payment status
     if (data.order_status === "PAID") {
-      // Payment successful - redirect to success page
+      // Update DB to reflect success
+      const [payment] = await db.select().from(orderPayments).where(eq(orderPayments.payment_ref, orderId));
+      if (payment) {
+        await db.update(orderPayments).set({ status: "success", verified: true }).where(eq(orderPayments.id, payment.id));
+        await db.update(orders).set({ payment_status: "paid", status: "confirmed", updated_at: new Date() }).where(eq(orders.id, payment.order_id));
+      }
       return NextResponse.redirect(new URL(`/payment/success?order_id=${orderId}`, req.url));
     } else {
-      // Payment failed or pending - redirect to failure page
       const errorMessage = data.order_status === "ACTIVE" ? "Payment+pending" : "Payment+failed";
       return NextResponse.redirect(new URL(`/payment/failure?order_id=${orderId}&error=${errorMessage}`, req.url));
     }
   } catch (err: any) {
     console.error("Payment return handler error:", err);
-    // Redirect to failure page with generic error
     return NextResponse.redirect(new URL(`/payment/failure?error=Something+went+wrong`, req.url));
   }
 }

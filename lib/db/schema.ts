@@ -7,6 +7,13 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   fullName: text('full_name'),
   avatarUrl: text('avatar_url'),
+  phoneNumber: text('phone_number').unique(),
+  city: text('city'),
+  userAddress: text('user_address'),
+  pinCode: numeric('pin_code'),
+  role: text('role').default('USER'),
+  country: text('country').default('India'),
+  userId: uuid('user_id').notNull().unique(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -53,7 +60,7 @@ export const products = pgTable('products', {
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  calculatedPrice: integer('calculated_price'),
+  calculatedPrice: numeric('calculated_price', { precision: 12, scale: 2 }),
 });
 
 // Orders table
@@ -62,7 +69,7 @@ export const products = pgTable('products', {
 
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
-  user_id: uuid("user_id").references(() => users.id),   // link to users table
+  user_id: uuid("user_id").references(() => users.userId),   // link to users.user_id per SQL schema
   order_number: text("order_number").notNull().unique(),
   status: text("status").notNull().default("pending"),
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
@@ -88,7 +95,7 @@ export const orderItems = pgTable("order_items", {
   product_id: uuid("product_id")
     .notNull()
     .references(() => products.id),
-  quantity: numeric("quantity").notNull(), // Drizzle doesn’t support int check > 0, enforce in code
+  quantity: integer("quantity").notNull(), // integer per SQL schema
   size: text("size"),
   color: text("color"),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),

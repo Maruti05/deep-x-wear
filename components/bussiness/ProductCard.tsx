@@ -4,7 +4,6 @@ import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import Link from "next/link";
 import { ProductCardType } from "@/app/types/ProductType";
-import { getDiscountedPrice } from "@/lib/utils";
 
 export const ProductCard: React.FC<ProductCardType> = ({
   id,
@@ -27,11 +26,11 @@ export const ProductCard: React.FC<ProductCardType> = ({
   createdAt,
   updatedAt,
   item = {},
-  calculatedPrice
+  calculatedPrice,
 }) => {
   return (
     <>
-      {/* ───────────────────────── Card ───────────────────────── */}
+      {/* Card */}
       <Link
         href={{
           pathname: `/${id}`,
@@ -39,8 +38,8 @@ export const ProductCard: React.FC<ProductCardType> = ({
         }}
         className="flex w-full min-w-[140px] max-w-[350px] flex-auto group"
       >
-        <Card className="w-full flex-1  overflow-hidden p-0">
-          <div className="relative w-full aspect-[2/2]">
+        <Card className="w-full flex-1 overflow-hidden p-0 transition-transform duration-300 ease-out hover:translate-y-[-2px] hover:shadow-md">
+          <div className="relative w-full aspect-square bg-accent/20">
             <Image
               src={mainImageUrl}
               alt={name}
@@ -49,14 +48,11 @@ export const ProductCard: React.FC<ProductCardType> = ({
                      (min-width: 768px) 33vw,
                      (min-width: 640px) 50vw,
                      100vw"
-              className="object-cover object-center transition-transform duration-300 ease-in-out group-hover:scale-105 cursor-pointer"
+              className="object-cover object-center transition-transform duration-300 ease-in-out group-hover:scale-[1.03]"
               priority
             />
             {discount > 0 && (
-              <Badge
-                className="absolute top-2 left-2 bg-green-500 text-white"
-                variant="secondary"
-              >
+              <Badge className="absolute top-2 left-2" variant="secondary">
                 {discount}% OFF
               </Badge>
             )}

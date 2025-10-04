@@ -2,18 +2,36 @@ import { db } from "@/lib/db";
 import { orderPayments, orders, webhookLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { CashfreeAPI } from "@/lib/payments/cashfree";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Read raw body text for signature verification
+    const rawBody = await req.text();
+    const body = JSON.parse(rawBody);
     const headers = Object.fromEntries(req.headers);
-    console.log("Webhook received:", body.event || body.type);
+
+    const timestamp = headers["x-webhook-timestamp"] || headers["X-Webhook-Timestamp"];
+    const signature = headers["x-webhook-signature"] || headers["X-Webhook-Signature"];
+
+    const verified = CashfreeAPI.verifyWebhookSignature(String(signature || ""), String(timestamp || ""), rawBody);
+    if (!verified) {
+      console.error("Invalid webhook signature");
+      await db.insert(webhookLogs).values({
+        event_type: body.event || body.type,
+        headers,
+        payload: body,
+        verified: false,
+      });
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
 
     // Store raw event
     const [log] = await db.insert(webhookLogs).values({
       event_type: body.event || body.type,
       headers,
       payload: body,
+      verified: true,
     }).returning();
 
     // Get the order ID from the webhook payload
@@ -24,23 +42,22 @@ export async function POST(req: Request) {
     }
 
     // Find the payment record to get the associated order
-    const [payment] = await db.select().from(orderPayments)
-      .where(eq(orderPayments.payment_ref, orderId));
-    
+    const [payment] = await db.select().from(orderPayments).where(eq(orderPayments.payment_ref, orderId));
     if (!payment) {
       console.error(`No payment found for order reference: ${orderId}`);
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    // Update based on payment event type
-    if (body.type === "PAYMENT_SUCCESS" || body.event === "payment.success") {
-      console.log(`Updating payment status for order: ${payment.order_id}`);
-      
+    // link webhook log to payment
+    await db.update(webhookLogs).set({ payment_id: payment.id }).where(eq(webhookLogs.id, log.id));
+
+    const eventType = body.type || body.event;
+    if (eventType === "PAYMENT_SUCCESS" || eventType === "payment.success") {
       // Update payment record
       await db.update(orderPayments).set({
         status: "success",
         verified: true,
-        payload: body, // Store the latest payload
+        payload: body,
       }).where(eq(orderPayments.payment_ref, orderId));
 
       // Update order record
@@ -49,10 +66,7 @@ export async function POST(req: Request) {
         status: "confirmed",
         updated_at: new Date(),
       }).where(eq(orders.id, payment.order_id));
-      
-      console.log(`Payment and order status updated successfully for: ${payment.order_id}`);
-    } else if (body.type === "PAYMENT_FAILED" || body.event === "payment.failed") {
-      // Handle failed payments
+    } else if (eventType === "PAYMENT_FAILED" || eventType === "payment.failed") {
       await db.update(orderPayments).set({
         status: "failed",
         payload: body,
@@ -60,6 +74,16 @@ export async function POST(req: Request) {
 
       await db.update(orders).set({
         payment_status: "failed",
+        updated_at: new Date(),
+      }).where(eq(orders.id, payment.order_id));
+    } else if (eventType === "PAYMENT_REFUND" || eventType === "payment.refund") {
+      await db.update(orderPayments).set({
+        status: "refunded",
+        payload: body,
+      }).where(eq(orderPayments.payment_ref, orderId));
+
+      await db.update(orders).set({
+        payment_status: "refunded",
         updated_at: new Date(),
       }).where(eq(orders.id, payment.order_id));
     }

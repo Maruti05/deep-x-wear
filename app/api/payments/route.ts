@@ -1,59 +1,66 @@
-import { supabase } from "@/lib/supabase-browser";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { db } from "@/lib/db";
+import { orderPayments, orders } from "@/lib/db/schema";
+import { CashfreeAPI } from "@/lib/payments/cashfree";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
-  const { orderId, amount, userData } = await req.json();
-  
-  // Get user data from the request payload
-  const customerId = userData?.id || `user-${(Math.random()*100000).toFixed(0)}`;
-  const customerEmail = userData?.email || `user-${(Math.random()*100000).toFixed(0)}@gmail.com`;
-  const customerPhone = userData?.phone || "9999999999";
+  try {
+    const { orderId, amount, userData } = await req.json();
 
-  // 🔹 Call Cashfree (Sandbox mode for testing)
-  const cashfreeUrl = "https://sandbox.cashfree.com/pg/orders";
-  const res = await fetch(cashfreeUrl, {
-    method: "POST",
-    headers: {
-      "x-client-id": process.env.CASHFREE_CLIENT_ID!,
-      "x-client-secret": process.env.CASHFREE_CLIENT_SECRET!,
-      "x-api-version": "2022-09-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    if (!orderId || !amount) {
+      return NextResponse.json({ error: "Missing orderId or amount" }, { status: 400 });
+    }
+
+    // Validate order exists and amount matches
+    const existingOrder = await db.select().from(orders).where(eq(orders.id, orderId));
+    const order = existingOrder[0];
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    const expectedAmount = Number(order.total);
+    if (Number(amount) !== expectedAmount) {
+      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
+    }
+
+    // Idempotency: if a payment exists and not failed, return existing session
+    const existing = await db.select().from(orderPayments).where(eq(orderPayments.order_id, orderId));
+    const existingPayment = existing.find((p: any) => p.status !== "failed");
+
+    if (existingPayment?.payment_ref) {
+      const existingCFOrder = await CashfreeAPI.getOrder(existingPayment.payment_ref);
+      if (existingCFOrder.payment_session_id || existingCFOrder.order_status === "PAID") {
+        return NextResponse.json(existingCFOrder);
+      }
+    }
+
+    const customerId = userData?.id || `user-${(Math.random() * 100000).toFixed(0)}`;
+    const customerEmail = userData?.email || `user-${(Math.random() * 100000).toFixed(0)}@gmail.com`;
+    const customerPhone = userData?.phone || "9999999999";
+
+    const data = await CashfreeAPI.createOrder({
       order_id: orderId,
-      order_amount: amount,
-      order_currency: "INR",
+      order_amount: expectedAmount,
       customer_details: {
         customer_id: customerId,
         customer_email: customerEmail,
         customer_phone: customerPhone,
       },
-    }),
-  });
- console.log("cashfree response", res);
-  const data = await res.json();
-  console.log("cashfree response", data);
+    });
 
-  if (!res.ok) {
-    return NextResponse.json({ error: data }, { status: res.status });
+    await db.insert(orderPayments).values({
+      order_id: orderId,
+      gateway: "cashfree",
+      amount: String(expectedAmount),
+      status: "pending",
+      payment_ref: data.order_id,
+      payload: data,
+    });
+
+    return NextResponse.json(data);
+  } catch (err: any) {
+    console.error("/api/payments error:", err?.data || err?.message || err);
+    const status = err?.status || 500;
+    return NextResponse.json({ error: err?.data || err?.message || "Payment initialization failed" }, { status });
   }
-
-  // 🔹 Save payment initiation in Supabase
-  const { error } = await supabase.from("order_payments").insert({
-    order_id: orderId,
-    gateway: "cashfree",
-    amount,
-    status: "pending",
-    payment_ref: data.order_id, // cashfree's order id
-    payload: data,              // full JSON response
-  });
-
-  if (error) {
-    console.error("DB insert error:", error);
-    return NextResponse.json({ error: "Failed to save payment" }, { status: 500 });
-  }
-
-  // 🔹 Return response to frontend
-  return NextResponse.json(data);
 }
