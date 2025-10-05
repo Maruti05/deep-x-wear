@@ -88,7 +88,7 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
           email: data.email,
           password: data.password,
           options: {
-            // emailRedirectTo: "http://localhost:3000/verify",
+            // emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/verify`,
             data: {
               display_name: data.full_name,
               //phone_number: data.phone_number, // Assuming phone number is in Indian format
