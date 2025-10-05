@@ -10,13 +10,15 @@ export default function Home() {
   const { show, hide } = useGlobalLoading();
   const { refresh, isError, isLoading, products } = useProducts();
 
+  // Show global loader only while the initial list is loading and no data is yet available
   useEffect(() => {
-    if (isLoading) {
+    const shouldShow = isLoading && (!products || products.length === 0);
+    if (shouldShow) {
       show();
     } else {
       hide();
     }
-  }, [isLoading]);
+  }, [isLoading, products, show, hide]);
 
   // Scroll reveal: observe elements with [data-reveal]
   useEffect(() => {
@@ -45,24 +47,44 @@ export default function Home() {
       .map((item: ProductType) => item.mainImageUrl);
   }, [products]);
 
+  // Skeleton grid while product list loads (initial fetch)
+  const renderSkeletonGrid = () => (
+    <main className="container mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 auto-rows-fr mt-4">
+      {Array.from({ length: 8 }).map((_, idx) => (
+        <div
+          key={idx}
+          className="opacity-100 translate-y-0 rounded-md border border-border p-2 animate-pulse"
+        >
+          <div className="aspect-square rounded-md bg-muted mb-2" />
+          <div className="h-4 w-3/4 bg-muted rounded mb-1" />
+          <div className="h-4 w-1/2 bg-muted rounded" />
+        </div>
+      ))}
+    </main>
+  );
+
   return (
     <div className="min-h-screen px-2 pb-20 pt-4 sm:px-8 sm:pt-12 font-[family-name:var(--font-geist-sans)]">
       {products && trendyImages.length > 0 && (
         <ResponsiveCarouselWithDots items={trendyImages} />
       )}
-      <main className="container mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 auto-rows-fr mt-4">
-        {products &&
-          products.map((item: ProductType, idx: number) => (
-            <div
-              key={item.id}
-              data-reveal
-              className="opacity-0 translate-y-4 transition-all duration-500 ease-out will-change-transform will-change-opacity"
-              style={{ transitionDelay: `${Math.min(idx, 20) * 40}ms` }}
-            >
-              <ProductCard {...item} item={item} />
-            </div>
-          ))}
-      </main>
+      {(!products || products.length === 0) && isLoading ? (
+        renderSkeletonGrid()
+      ) : (
+        <main className="container mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 auto-rows-fr mt-4">
+          {products &&
+            products.map((item: ProductType, idx: number) => (
+              <div
+                key={item.id}
+                data-reveal
+                className="opacity-0 translate-y-4 transition-all duration-500 ease-out will-change-transform will-change-opacity"
+                style={{ transitionDelay: `${Math.min(idx, 20) * 40}ms` }}
+              >
+                <ProductCard {...item} item={item} />
+              </div>
+            ))}
+        </main>
+      )}
     </div>
   );
 }

@@ -32,7 +32,10 @@ export function useProducts() {
     isLoading,
     mutate: refresh,
   } = useSWR<ProductType[]>("/api/products", fetcher, {
-    revalidateOnFocus: false, // tweak per UX needs
+    revalidateOnFocus: false, // UX: avoid refetch on focus that causes flicker
+    revalidateOnReconnect: true, // stay fresh when connectivity returns
+    keepPreviousData: true as any, // smooth list updates during background revalidation
+    dedupingInterval: 1000, // avoid redundant requests within 1s window
   });
 
   return {

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
+import { useGlobalLoading } from "@/components/common/LoadingProvider";
 // removed: import { supabase } from "@/lib/supabase-browser";
 
 type CartItem = {
@@ -28,6 +29,7 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
   const { user: authUser } = useAuth();
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { show, hide } = useGlobalLoading();
 
   useEffect(() => {
     if ((window as any).Cashfree) return setSdkLoaded(true);
@@ -55,6 +57,7 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
       return;
     }
     setLoading(true);
+    show();
 
     try {
       const selectedCartItems = cart.filter((_, i) => selectedItems[i]);
@@ -135,6 +138,7 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
       toast.error(err.message || "Payment failed. Please try again.");
     } finally {
       setLoading(false);
+      hide();
     }
   };
 

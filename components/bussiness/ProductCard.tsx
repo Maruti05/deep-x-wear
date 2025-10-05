@@ -1,9 +1,12 @@
+"use client";
+
 import React from "react";
 import Image from "next/image";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import Link from "next/link";
 import { ProductCardType } from "@/app/types/ProductType";
+import { useGlobalLoading } from "@/components/common/LoadingProvider";
 
 export const ProductCard: React.FC<ProductCardType> = ({
   id,
@@ -28,6 +31,7 @@ export const ProductCard: React.FC<ProductCardType> = ({
   item = {},
   calculatedPrice,
 }) => {
+  const { show } = useGlobalLoading();
   return (
     <>
       {/* Card */}
@@ -35,6 +39,11 @@ export const ProductCard: React.FC<ProductCardType> = ({
         href={{
           pathname: `/${id}`,
           query: { data: JSON.stringify(item) },
+        }}
+        prefetch
+        onClick={() => {
+          // Show global loader to indicate route transition to product details
+          show();
         }}
         className="flex w-full min-w-[140px] max-w-[350px] flex-auto group"
       >

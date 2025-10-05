@@ -118,9 +118,10 @@ export default function Page() {
   );
 
   useEffect(() => {
-    if (isLoading) show();
+    const shouldShow = isLoading && (!data || !Array.isArray(data.orders) || data.orders.length === 0);
+    if (shouldShow) show();
     else hide();
-  }, [isLoading, show, hide]);
+  }, [isLoading, data, show, hide]);
 
   const orders = data?.orders || [];
   const meta = data?.meta || { page, pageSize, total: 0, totalPages: 1 };

@@ -11,14 +11,18 @@ import { useCart } from "@/app/context/CartContext";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useGlobalLoading } from "@/components/common/LoadingProvider";
 
 export function ProductContent({ product }: { product: ProductType }) {
   const navigate = useRouter();
   const { addToCart } = useCart();
+  const { show, hide } = useGlobalLoading();
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]?.name ?? "");
   const [quantity, setQuantity] = useState(0);
   const [isAddToCartClicked, setIsAddToCartClicked] = useState(false);
+  const [imageReady, setImageReady] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const handleAddToCart = async () => {
     if (isAddToCartClicked) {
@@ -49,6 +53,8 @@ export function ProductContent({ product }: { product: ProductType }) {
     addToCart(newItem);
 
     try {
+      setSyncing(true);
+      show();
       const res = await fetch(`/api/cart/${cartId}/items`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +79,9 @@ export function ProductContent({ product }: { product: ProductType }) {
     } catch (err) {
       console.error(err);
       toast.error('Could not sync with backend.');
+    } finally {
+      setSyncing(false);
+      hide();
     }
   };
 
@@ -81,6 +90,9 @@ export function ProductContent({ product }: { product: ProductType }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left Column - Image */}
         <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+          {!imageReady && (
+            <div className="absolute inset-0 animate-pulse bg-muted" />
+          )}
           {product.mainImageUrl && (
             <Image
               src={product.mainImageUrl}
@@ -88,6 +100,8 @@ export function ProductContent({ product }: { product: ProductType }) {
               fill
               className="object-cover"
               priority
+              onLoad={() => setImageReady(true)}
+              onLoadingComplete={() => setImageReady(true)}
             />
           )}
         </div>
@@ -208,12 +222,14 @@ export function ProductContent({ product }: { product: ProductType }) {
               size="lg"
               className="w-full mt-4"
               disabled={
-                product.stockQuantity === 0 || quantity === 0 || !size || !color
+                syncing || product.stockQuantity === 0 || quantity === 0 || !size || !color
               }
               onClick={handleAddToCart}
             >
               <ShoppingCart className="mr-2 h-5 w-5" />
-              {quantity === 0
+              {syncing
+                ? "Adding..."
+                : quantity === 0
                 ? "Select Quantity"
                 : !size
                 ? "Select Size"

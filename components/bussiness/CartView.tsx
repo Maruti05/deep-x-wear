@@ -30,11 +30,13 @@ import Banner from "./CheckoutBanner";
 import { useModal } from "@/app/context/ModalContext";
 import { supabase } from "../admin/ProductForm";
 import PayButton from "../common/PayButton";
+import { useGlobalLoading } from "@/components/common/LoadingProvider";
 
 export default function CartView() {
   const { openModal } = useModal();
   const { user: authUser } = useAuth();
   const { cart, updateCartItem, removeFromCart, clearCart } = useCart();
+  const { show, hide } = useGlobalLoading();
   const [selectedItems, setSelectedItems] = useState<boolean[]>(
     cart.map(() => true)
   );
@@ -66,6 +68,7 @@ export default function CartView() {
     if (!cartId) return;
     const item = cart[index];
     try {
+      show();
       const res = await fetch(`/api/cart/${cartId}/items`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -84,6 +87,8 @@ export default function CartView() {
     } catch (err) {
       console.error(err);
       toast.error('Failed to sync quantity');
+    } finally {
+      hide();
     }
   };
 
@@ -118,11 +123,14 @@ export default function CartView() {
     }
 
     try {
+      show();
       const res = await fetch(`/api/cart/${cartId}/items/${backendItemId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to remove item');
     } catch (err) {
       console.error(err);
       toast.error('Failed to remove from backend');
+    } finally {
+      hide();
     }
   };
 
@@ -142,6 +150,7 @@ export default function CartView() {
     if (isDisabled) return;
 
     try {
+      show();
 
       // build order items payload
       const selectedCartItems = cart.filter((_, i) => selectedItems[i]);
@@ -203,6 +212,8 @@ export default function CartView() {
     } catch (err) {
       console.error(err);
       toast.error("Something went wrong while placing the order.");
+    } finally {
+      hide();
     }
   };
   return (

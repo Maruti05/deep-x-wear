@@ -65,12 +65,13 @@ export default function Page() {
 
   // ✅ Show loader while profile data is loading
   useEffect(() => {
-    if (isLoading) {
+    const shouldShow = isLoading && !user;
+    if (shouldShow) {
       show();
     } else {
       hide();
     }
-  }, [isLoading, show, hide]);
+  }, [isLoading, user, show, hide]);
 
   // ✅ Reset form when authUser changes
   useEffect(() => {

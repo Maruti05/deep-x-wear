@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { subscribe, unsubscribe } from "@/lib/realtime/cartEvents";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const cartId =await params.id;
+  const cartId =params.id;
   if (!cartId) return NextResponse.json({ error: "cart id is required" }, { status: 400 });
 
   const stream = new TransformStream();

@@ -47,7 +47,6 @@ export function CartRealtimeBridge() {
     esRef.current = es;
 
     es.addEventListener("updated", () => {
-      toast.success("Cart updated");
       fetchCart();
     });
     es.addEventListener("removed", () => {
