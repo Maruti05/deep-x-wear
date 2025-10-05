@@ -122,3 +122,28 @@ CREATE TABLE public.webhook_logs (
   CONSTRAINT webhook_logs_pkey PRIMARY KEY (id),
   CONSTRAINT webhook_logs_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.order_payments(id)
 );
+
+-- Cart system
+CREATE TABLE IF NOT EXISTS public.cart (
+  cart_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES public.users(user_id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.cart_items (
+  item_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  cart_id uuid REFERENCES public.cart(cart_id) ON DELETE CASCADE,
+  product_id uuid REFERENCES public.products(id) ON DELETE CASCADE,
+  quantity integer NOT NULL CHECK (quantity > 0),
+  price numeric(10,2) NOT NULL,
+  size text,
+  color text,
+  added_at timestamptz DEFAULT now()
+);
+
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_cart_user ON public.cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON public.cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product ON public.cart_items(product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_cart_items_variant ON public.cart_items(cart_id, product_id, size, color);

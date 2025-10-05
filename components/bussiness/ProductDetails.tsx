@@ -20,12 +20,19 @@ export function ProductContent({ product }: { product: ProductType }) {
   const [quantity, setQuantity] = useState(0);
   const [isAddToCartClicked, setIsAddToCartClicked] = useState(false);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (isAddToCartClicked) {
       navigate.push("/cart");
       return;
     }
-    addToCart({
+
+    const cartId = typeof window !== 'undefined' ? localStorage.getItem('cart_id') : null;
+    if (!cartId) {
+      toast.error('No cart found. Please login to create your cart.');
+      return;
+    }
+
+    const newItem = {
       productId: product.id,
       name: product.name,
       price: product.price,
@@ -34,13 +41,39 @@ export function ProductContent({ product }: { product: ProductType }) {
       color,
       quantity,
       discount: product.discount,
-      calculatedPrice:product.calculatedPrice,
-      stockQuantity:product.stockQuantity
-    });
-    toast.success(`${product.name} added to cart!`, {
-      duration: 3000,
-    });
-    setIsAddToCartClicked(true);
+      calculatedPrice: product.calculatedPrice,
+      stockQuantity: product.stockQuantity,
+    };
+
+    // Optimistic update
+    addToCart(newItem);
+
+    try {
+      const res = await fetch(`/api/cart/${cartId}/items`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            {
+              product_id: product.id,
+              quantity,
+              size,
+              color,
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to sync cart');
+      }
+
+      toast.success(`${product.name} added to cart!`, { duration: 3000 });
+      setIsAddToCartClicked(true);
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not sync with backend.');
+    }
   };
 
   return (
@@ -67,9 +100,7 @@ export function ProductContent({ product }: { product: ProductType }) {
               <p className="text-2xl font-semibold">
                 {" "}
                 ₹
-                {Number(
-                  product.calculatedPrice
-                ).toLocaleString()}
+                {Number(product.calculatedPrice).toLocaleString()}
               </p>
               {product.price && (
                 <p className="text-lg text-muted-foreground line-through">

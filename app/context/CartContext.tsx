@@ -11,10 +11,10 @@ export const useCart = () => {
 };
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCartState] = useState<CartItem[]>([]);
 
   const addToCart = (newItem: CartItem) => {
-    setCart(prev => {
+    setCartState(prev => {
       const existingIndex = prev.findIndex(
         item =>
           item.productId === newItem.productId &&
@@ -33,7 +33,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateCartItem = (index: number, updatedItem: Partial<CartItem>) => {
-    setCart(prev => {
+    setCartState(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...updatedItem };
       return updated;
@@ -41,16 +41,20 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const removeFromCart = (index: number) => {
-    setCart(prev => prev.filter((_, i) => i !== index));
+    setCartState(prev => prev.filter((_, i) => i !== index));
   };
 
   const clearCart = () => {
-    setCart([]);
+    setCartState([]);
+  };
+
+  const setCart = (items: CartItem[]) => {
+    setCartState(items);
   };
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, updateCartItem, removeFromCart, clearCart }}
+      value={{ cart, addToCart, updateCartItem, removeFromCart, clearCart, setCart }}
     >
       {children}
     </CartContext.Provider>

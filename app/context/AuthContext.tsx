@@ -30,6 +30,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  // Ensure a cart exists for the user and store cart_id in localStorage
+  const ensureCart = async (userId: string) => {
+    try {
+      const res = await fetch('/api/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const cartId = data?.cart?.cart_id;
+      if (cartId) {
+        localStorage.setItem('cart_id', cartId);
+      }
+    } catch (err) {
+      console.error('Failed to ensure cart:', err);
+    }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -54,6 +73,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             JSON.stringify({ user: authUser, accessToken: session.access_token }),
             COOKIE_OPTIONS
           );
+          // Create or fetch cart for logged-in user
+          await ensureCart(session.user.id);
         }
       } catch (error) {
         console.error('Auth initialization failed:', error);
@@ -114,6 +135,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       );
     }
 
+    // Kick off cart creation/upsert for this user
+    if (data?.user?.id) {
+      await ensureCart(data.user.id);
+    }
+
     // Only redirect if a redirect path is provided
     if (data.redirect) {
       router.push(data.redirect);
@@ -124,6 +150,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setAccessToken(null);
     Cookies.remove(COOKIE_NAME, { path: '/' });
+    // Clear cart_id from localStorage on logout
+    try { localStorage.removeItem('cart_id'); } catch {}
     router.push('/');
   };
 

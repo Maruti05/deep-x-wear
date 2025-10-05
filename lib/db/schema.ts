@@ -159,3 +159,22 @@ export const selectOrderSchema = createSelectSchema(orders);
 
 export const insertOrderItemSchema = createInsertSchema(orderItems);
 export const selectOrderItemSchema = createSelectSchema(orderItems);
+
+export const cart = pgTable("cart", {
+  cart_id: uuid("cart_id").defaultRandom().primaryKey(),
+  user_id: uuid("user_id").references(() => users.userId, { onDelete: "cascade" }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const cartItems = pgTable("cart_items", {
+  item_id: uuid("item_id").defaultRandom().primaryKey(),
+  cart_id: uuid("cart_id").references(() => cart.cart_id, { onDelete: "cascade" }),
+  product_id: uuid("product_id").references(() => products.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  // added variant fields
+  size: text("size"),
+  color: text("color"),
+  added_at: timestamp("added_at", { withTimezone: true }).defaultNow(),
+});
