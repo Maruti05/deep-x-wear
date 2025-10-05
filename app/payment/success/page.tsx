@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle, ArrowRight, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
@@ -89,5 +89,29 @@ export default function PaymentSuccessPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="text-center pb-2">
+              <div className="flex justify-center mb-4">
+                <CheckCircle className="h-16 w-16 text-green-500 animate-pulse" />
+              </div>
+              <CardTitle className="text-2xl font-bold text-green-600">Loading payment result…</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-gray-700">Please wait while we finalize your payment.</p>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <PaymentSuccessInner />
+    </Suspense>
   );
 }

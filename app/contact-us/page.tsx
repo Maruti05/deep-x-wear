@@ -28,7 +28,6 @@ export default function ContactUsForm() {
   });
 
   const onSubmit = (data: ContactFormData) => {
-    console.log("Contact Form Data:", data);
     reset();
   };
 

@@ -41,7 +41,6 @@ export default function CartView() {
     cart.map(() => true)
   );
   const [confirmClear, setConfirmClear] = useState(false);
-  console.log("isProfileComplete", authUser?.isProfileCompleted);
 
   const handleSelectChange = (index: number) => {
     const updated = [...selectedItems];

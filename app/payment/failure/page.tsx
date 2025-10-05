@@ -5,8 +5,9 @@ import { XCircle, RefreshCcw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function PaymentFailurePage() {
+function PaymentFailureInner() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("order_id");
   const errorMessage = searchParams.get("error") || "Your payment could not be processed";
@@ -76,5 +77,29 @@ export default function PaymentFailurePage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function PaymentFailurePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="text-center pb-2">
+              <div className="flex justify-center mb-4">
+                <XCircle className="h-16 w-16 text-red-500 animate-pulse" />
+              </div>
+              <CardTitle className="text-2xl font-bold text-red-600">Loading result…</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-gray-700">Please wait while we finalize your payment.</p>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <PaymentFailureInner />
+    </Suspense>
   );
 }

@@ -5,6 +5,9 @@ import { useProducts } from "@/hooks/useProducts";
 import { useEffect, useMemo } from "react";
 import { ProductType } from "./types/ProductType";
 import { ResponsiveCarouselWithDots } from "@/components/bussiness/Carousel";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function Home() {
   const { show, hide } = useGlobalLoading();
@@ -71,19 +74,68 @@ export default function Home() {
       {(!products || products.length === 0) && isLoading ? (
         renderSkeletonGrid()
       ) : (
-        <main className="container mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 auto-rows-fr mt-4">
-          {products &&
-            products.map((item: ProductType, idx: number) => (
-              <div
-                key={item.id}
-                data-reveal
-                className="opacity-0 translate-y-4 transition-all duration-500 ease-out will-change-transform will-change-opacity"
-                style={{ transitionDelay: `${Math.min(idx, 20) * 40}ms` }}
-              >
-                <ProductCard {...item} item={item} />
+        <div className="container mx-auto mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Product list: max height with custom scrollbar */}
+          <section className="lg:col-span-2">
+            <ScrollArea className="max-h-[72vh] rounded-md border">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 p-2">
+                {products &&
+                  products.map((item: ProductType, idx: number) => (
+                    <div
+                      key={item.id}
+                      data-reveal
+                      className="opacity-0 translate-y-4 transition-all duration-500 ease-out will-change-transform will-change-opacity"
+                      style={{ transitionDelay: `${Math.min(idx, 20) * 40}ms` }}
+                    >
+                      <ProductCard {...item} item={item} />
+                    </div>
+                  ))}
               </div>
-            ))}
-        </main>
+            </ScrollArea>
+          </section>
+
+          {/* Modern product suggestions with smooth animations */}
+          <aside className="space-y-4">
+            <h3 className="text-lg font-semibold">Suggested for you</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(products || []).slice(0, 6).map((item: ProductType, i) => (
+                <motion.div
+                  key={`sugg-${item.id}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
+                  className="rounded-md border p-2 hover:shadow-sm bg-background"
+                >
+                  <Link
+                    href={{ pathname: `/${item.id}`, query: { data: JSON.stringify(item) } }}
+                    prefetch
+                    className="block"
+                    onClick={() => show()}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-16 w-16 rounded-md overflow-hidden bg-muted">
+                        <img
+                          src={item.mainImageUrl}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          ₹ {Number(item.calculatedPrice).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );

@@ -72,7 +72,6 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
       }
 
       const session = authData.session;
-      console.log("Session data:", session);
 
       if (!session) {
         throw new Error("Session not returned from Supabase");
@@ -91,7 +90,6 @@ export function LoginPopup({ onClose }: { onClose: () => void }) {
       //   throw new Error("Failed to fetch user details");
       // }
       const userDetails = await getUser();
-      console.log("User details:", userDetails);
 
       login({
         ...authData,

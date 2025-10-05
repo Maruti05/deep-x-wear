@@ -103,7 +103,6 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
       }
 
       const user_id = authResult.user?.id;
-      console.log(authResult);
       
       if (!user_id) throw new Error("No user ID returned from Supabase");
       // mutate({

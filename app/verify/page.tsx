@@ -12,7 +12,6 @@ export default function VerifyPage() {
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (session) {
-        console.log("User verified and signed in", session);
         router.push("/");
       } else {
         console.error("Verification failed", error);

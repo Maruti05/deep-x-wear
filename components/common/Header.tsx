@@ -72,10 +72,8 @@ export const Header: React.FC<HeaderProps> = ({
   const totalItems = cart.length;
   const { openModal } = useModal();
   const { accessToken, user: authUser, logout } = useAuth();
-  console.log("Header user:", authUser, accessToken);
 
   const isAuthenticated = authUser?.isLoginnedIn;
-  console.log("Is Authenticated:", isAuthenticated);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/50">

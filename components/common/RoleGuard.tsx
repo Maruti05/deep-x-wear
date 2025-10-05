@@ -22,10 +22,8 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
     }
 
     const role = user.additionalData?.role || user.role;
-    console.log("Current user role:", role); // Debug log
 
     if (!allowedRoles.includes(role)) {
-      console.log("Access denied. Allowed roles:", allowedRoles); // Debug log
       router.replace("/403"); // forbidden page
     }
   }, [user, isLoading, router, allowedRoles]);
@@ -39,7 +37,6 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   }
 
   const role = user.additionalData?.role || user.role;
-  console.log("Rendering check - User role:", role, "Allowed roles:", allowedRoles);
   
   if (!allowedRoles.includes(role)) {
     return null; // prevent flash of unauthorized content

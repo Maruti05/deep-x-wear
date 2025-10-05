@@ -6,7 +6,7 @@ import { publish } from "@/lib/realtime/cartEvents";
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
-    const cartId =params.id;
+    const cartId = (await params).id;
     if (!cartId) return NextResponse.json({ error: "cart id is required" }, { status: 400 });
 
     const { items } = await req.json();

@@ -123,7 +123,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ...(data.isProfileCompleted !== undefined && { isProfileCompleted: data.isProfileCompleted }),
     };
 
-    console.log('Setting user with role:', authUser.role); // Debug log
     
     setUser(authUser);
     if (data.access_token) {

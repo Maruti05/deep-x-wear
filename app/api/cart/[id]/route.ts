@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
-    const cartId =params.id;
+    const { id } = params;
+    const cartId = id;
     if (!cartId) {
       return NextResponse.json({ error: "cart id is required" }, { status: 400 });
     }
