@@ -1,30 +1,25 @@
 "use client";
 import { ProductType } from "@/app/types/ProductType";
-// -----------------------------------------------------------------------------
-// useProducts.ts ✦ Client‑side data hook for fetching products from MySQL
-// -----------------------------------------------------------------------------
-// ⬢ Requires: `npm i swr` (or swap for TanStack Query)
-// The hook calls the Next.js route handler at /api/products and returns
-// loading, error, and refresh helpers so your ProductCard list can reactively
-// update when items are added to the cart or inventory changes.
-// -----------------------------------------------------------------------------
-
 import useSWR from "swr";
 
-/* -------------------------------------------------------------------------
- * 1 ▸ Product type — keep in sync with your Prisma `Product` model
- * ---------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------
- * 2 ▸ SWR fetcher util (tiny)
- * ---------------------------------------------------------------------- */
-const fetcher = (url: string) => fetch(url).then((res) => {
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+// Small, hardened fetcher: no intermediate caching, send cookies
+const fetcher = async (url: string) => {
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    const error = new Error(errData.error || `Request failed: ${res.status}`);
+    (error as any).status = res.status;
+    (error as any).details = errData;
+    throw error;
+  }
   return res.json();
-});
+};
 
-/* -------------------------------------------------------------------------
- * 3 ▸ useProducts Hook
- * ---------------------------------------------------------------------- */
 export function useProducts() {
   const {
     data: products,
@@ -32,16 +27,17 @@ export function useProducts() {
     isLoading,
     mutate: refresh,
   } = useSWR<ProductType[]>("/api/products", fetcher, {
-    revalidateOnFocus: false, // UX: avoid refetch on focus that causes flicker
-    revalidateOnReconnect: true, // stay fresh when connectivity returns
-    keepPreviousData: true as any, // smooth list updates during background revalidation
-    dedupingInterval: 1000, // avoid redundant requests within 1s window
+    revalidateOnFocus: false, // avoid flicker on tab focus
+    revalidateOnReconnect: true, // keep data fresh
+    keepPreviousData: true, // smooth list updates during background revalidation
+    dedupingInterval: 1000, // avoid redundant requests within a short window
+    shouldRetryOnError: false,
   });
 
   return {
     products: products ?? [],
     isLoading,
     isError: Boolean(error),
-    refresh, // call to re‑fetch manually (e.g., after cart ops)
+    refresh, // manual refresh (e.g., after cart ops)
   } as const;
 }

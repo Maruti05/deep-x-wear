@@ -1,51 +1,65 @@
-import { supabase } from "@/components/admin/ProductForm";
-
+"use client";
+import useSWRMutation from "swr/mutation";
+import Cookies from "js-cookie";
 
 type UserDetails = {
   full_name: string;
   email: string;
-  phone_number: string;
+  phone_number?: string;
   user_id: string;
   user_address?: string;
   city?: string;
   state_name?: string;
   pin_code?: number;
   country?: string;
-  role: "USER" | "ADMIN"; 
-  // map_location?: { latitude: number; longitude: number } | null;
+  role: "USER" | "ADMIN";
 };
 
-
- async function createUser({
-  userDetails,
-}: {
-  userDetails: UserDetails
-}) {
-  const { data, error } = await supabase
-    .from("users")
-    .insert([userDetails]);
-
-  if (error) {
-    throw new Error(error.message || "Failed to create user");
-  }
-
-  if (!data ) {
-    throw new Error("No user data returned");
-  }
-
-  return data[0];
-}
+const KEY = "/api/user-details";
 
 export function useCreateUser() {
-//   return useMutation(createUser);
-return {
-    mutate: createUser,
-    isLoading: false, // Replace with actual loading state          
-    isError: false, // Replace with actual error state
-    error: null, // Replace with actual error object
-    isSuccess: false, // Replace with actual success state
-    data: null, // Replace with actual data returned from mutation
-    reset: () => {}, // Function to reset the mutation state
-    status: "idle", // Replace with actual status of the mutation   
-}
+  const { trigger, data, error, isMutating, reset } = useSWRMutation(
+    KEY,
+    async (url: string, { arg }: { arg: UserDetails }) => {
+      const csrfToken = Cookies.get("csrf_token");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-CSRF-Token": csrfToken || "",
+        },
+        body: JSON.stringify(arg),
+        cache: "no-store",
+        credentials: "same-origin",
+        redirect: "error",
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw Object.assign(new Error(errData.error || "Failed to create user"), {
+          status: res.status,
+          details: errData,
+        });
+      }
+
+      return res.json();
+    }
+  );
+
+  // Backwards-compatible mutate signature
+  const mutate = async ({ userDetails }: { userDetails: UserDetails }) => {
+    return trigger(userDetails);
+  };
+
+  return {
+    mutate,
+    data: data ?? null,
+    error: error ?? null,
+    isLoading: isMutating,
+    isError: Boolean(error),
+    isSuccess: Boolean(data && !error),
+    reset,
+    status: isMutating ? "loading" : data ? "success" : error ? "error" : "idle",
+  } as const;
 }

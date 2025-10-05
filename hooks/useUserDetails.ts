@@ -1,8 +1,18 @@
 // hooks/useUserDetails.ts
+import { useCallback } from "react";
 import useSWR from "swr";
+import Cookies from "js-cookie";
 
+// Centralized fetcher with robust error handling and safe JSON parsing
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+    // Prevent any intermediate caching and ensure cookies are sent
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
     const error = new Error(errData.error || `Request failed: ${res.status}`);
@@ -13,94 +23,83 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
+const KEY = "/api/user-details";
+
 export function useUserDetails() {
-  // ❌ No auto-fetch on mount → initial key = null
+  // Keep a stable SWR key so mutations and revalidation work reliably
   const {
     data: user,
     error,
     isLoading,
-    mutate: refresh,
-  } = useSWR(null, fetcher, { revalidateOnFocus: false });
+    mutate,
+  } = useSWR(KEY, fetcher, {
+    revalidateOnFocus: false, // avoid flicker when switching tabs
+    revalidateOnMount: false, // opt-in manual fetch on demand
+    revalidateOnReconnect: true,
+    dedupingInterval: 1000, // reduce redundant requests
+    shouldRetryOnError: false,
+    fallbackData: null,
+  });
 
-  // 🔹 GET user manually
-  const getUser = async () => {
-    try {
-      const res = await fetch("/api/user-details", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw Object.assign(new Error(errData.error || "Fetch failed"), {
-          status: res.status,
-          details: errData,
-        });
-      }
-      const data = await res.json();
-      // Update SWR cache
-      refresh(data, false);
-      return data;
-    } catch (err) {
-      console.error("Get user failed:", err);
-      throw err;
-    }
-  };
+  // Manually revalidate and return the latest data (no extra fetch duplication)
+  const getUser = useCallback(async () => {
+    const data = await mutate(); // revalidate using bound fetcher
+    return data ?? null;
+  }, [mutate]);
 
-  // 🔹 Insert new user
-  const insertUser = async (payload: Record<string, any>) => {
-    try {
-      const res = await fetch("/api/user-details", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+  // Insert new user via secure Next.js route handler, then refresh SWR cache
+  const insertUser = useCallback(async (payload: Record<string, any>) => {
+    const csrfToken = Cookies.get("csrf_token");
+    const res = await fetch(KEY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json", "X-CSRF-Token": csrfToken || "" },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(errData.error || "Insert failed"), {
+        status: res.status,
+        details: errData,
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw Object.assign(new Error(errData.error || "Insert failed"), {
-          status: res.status,
-          details: errData,
-        });
-      }
-      const data = await res.json();
-      await refresh();
-      return data;
-    } catch (err) {
-      console.error("Insert user failed:", err);
-      throw err;
     }
-  };
+    const data = await res.json();
+    await mutate(); // refresh from server to ensure consistency
+    return data;
+  }, [mutate]);
 
-  // 🔹 Update user
-  const updateUser = async (payload: Record<string, any>) => {
-    try {
-      const res = await fetch("/api/user-details", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+  // Update user via secure Next.js route handler, then refresh SWR cache
+  const updateUser = useCallback(async (payload: Record<string, any>) => {
+    const csrfToken = Cookies.get("csrf_token");
+    const res = await fetch(KEY, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Accept": "application/json", "X-CSRF-Token": csrfToken || "" },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      credentials: "same-origin",
+      redirect: "error",
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(errData.error || "Update failed"), {
+        status: res.status,
+        details: errData,
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw Object.assign(new Error(errData.error || "Update failed"), {
-          status: res.status,
-          details: errData,
-        });
-      }
-      const data = await res.json();
-      await refresh();
-      return data;
-    } catch (err) {
-      console.error("Update user failed:", err);
-      throw err;
     }
-  };
+    const data = await res.json();
+    await mutate(); // refresh from server
+    return data;
+  }, [mutate]);
 
   return {
     user: user ?? null,
     isLoading,
     isError: Boolean(error),
     error: error ?? null,
-    refresh,
-    getUser,     // 👈 manual fetch
+    refresh: mutate,
+    getUser, // manual fetch/revalidate
     insertUser,
     updateUser,
   } as const;
