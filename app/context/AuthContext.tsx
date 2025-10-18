@@ -7,6 +7,7 @@ import Cookies from 'js-cookie';
 import { createBrowserClient } from "@supabase/ssr";
 import { useUserDetails } from "@/hooks/useUserDetails";
 import { verifyRequiredFieldsPresent } from "@/lib/utils";
+import { useEnsureCartMutation } from "@/hooks/useCart";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,21 +32,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   // Ensure a cart exists for the user and store cart_id in localStorage
+  const ensureCartMutation = useEnsureCartMutation();
   const ensureCart = async (userId: string) => {
     try {
-      const res = await fetch('/api/cart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const cartId = data?.cart?.cart_id;
-      if (cartId) {
-        localStorage.setItem('cart_id', cartId);
-      }
+      await ensureCartMutation.mutateAsync(userId);
     } catch (err) {
-      console.error('Failed to ensure cart:', err);
+      console.error("Failed to ensure cart:", err);
     }
   };
 

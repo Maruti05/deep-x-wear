@@ -2,10 +2,14 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useCart } from "@/app/context/CartContext";
+import { getJSON } from "@/lib/http";
+import { useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "@/lib/query-keys";
 
 export function CartRealtimeBridge() {
   const { setCart } = useCart();
   const esRef = useRef<EventSource | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const cartId = typeof window !== "undefined" ? localStorage.getItem("cart_id") : null;
@@ -28,11 +32,11 @@ export function CartRealtimeBridge() {
 
     const fetchCart = async () => {
       try {
-        const res = await fetch(`/api/cart/${cartId}`);
-        if (!res.ok) throw new Error("Failed to fetch cart");
-        const data = await res.json();
+        const data = await getJSON(`/api/cart/${cartId}`, { emitGlobalEvents: false });
         if (Array.isArray(data.items)) {
           setCart(mapItems(data.items));
+          // keep react-query cache in sync too
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.cart(cartId) });
         }
       } catch (e) {
         console.error(e);

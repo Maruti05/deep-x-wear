@@ -25,11 +25,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { useModal } from "@/app/context/ModalContext";
 import { ScrollArea } from "../ui/scroll-area";
 import { toast } from "sonner";
-import { fi } from "zod/v4/locales";
 import { supabase } from "../admin/ProductForm";
 import { showToast } from "@/lib/sweetalert-theme";
 import { useGlobalLoading } from "../common/LoadingProvider";
-import { useUserDetails } from "@/hooks/useUserDetails";
+
 /* -------------------------------------------------- */
 const signupSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -63,76 +62,45 @@ export default function SignupForm({ onClose }: { onClose: () => void }) {
     mode: "onChange",
   });
   const { openModal, closeModal } = useModal();
-  // const { mutate, isLoading, isError, error } = useCreateUser();
-  const { user, isLoading, error,isError, insertUser, updateUser } = useUserDetails();
-  /* ---------- Get geolocation ---------- */
-  const fetchLocation = () => {
-    if (!navigator.geolocation)
-      return console.error("Geolocation not supported");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setMapLocation({ latitude, longitude });
-      },
-      (err) => console.error("Location error", err)
-    );
-  };
+  // React Query mutation for inserting user details
+  const { mutate, isLoading, isError, isSuccess, data, error } = useCreateUser();
 
-  /* ---------- Submit ---------- */
   async function onSubmit(data: SignupFormValues) {
     try {
-      // Sign up using Supabase Auth
       show();
-      const { data: authResult, error: authError } = await supabase.auth.signUp(
-        {
-          email: data.email,
-          password: data.password,
-          options: {
-            // emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/verify`,
-            data: {
-              display_name: data.full_name,
-              //phone_number: data.phone_number, // Assuming phone number is in Indian format
-            },
-          },
-        }
-      );
-
-      if (authError) {
-        console.error("Auth error:", authError);
-        throw authError;
-      }
-
-      const user_id = authResult.user?.id;
-      
-      if (!user_id) throw new Error("No user ID returned from Supabase");
-      // mutate({
-      //   userDetails: {
-      //     full_name: data.full_name,
-      //     email: data.email,
-      //     phone_number: data.phone_number, // Assuming phone number is in Indian format
-      //     user_id,
-      //     role: "USER",
-      //   },
-      // });
-       insertUser({
-        user_id,
-        full_name: data.full_name,
+      // Sign up using Supabase Auth
+      const { data: authResult, error: authError } = await supabase.auth.signUp({
         email: data.email,
-        role: "USER",
+        password: data.password,
+        options: {
+          data: {
+            display_name: data.full_name,
+          },
+        },
       });
-      
-      if (error) {
-        console.error("Insert error:", error);
-        throw error;
-      }
-      toast.success("Account created successfully!",{
+      if (authError) throw authError;
+      const user_id = authResult.user?.id;
+      if (!user_id) throw new Error("No user ID returned from Supabase");
+
+      // Create user details via API
+      await mutate({
+        userDetails: {
+          full_name: data.full_name,
+          email: data.email,
+          user_id,
+          role: "USER",
+        },
+      });
+
+      toast.success("Account created successfully!", {
         description: "Please check your email to verify your account.",
       });
     } catch (err: any) {
+      console.error("Signup error:", err);
       toast.error(err?.message ?? "Failed to create account");
     } finally {
-      closeModal();
       hide();
+      closeModal();
     }
   }
 

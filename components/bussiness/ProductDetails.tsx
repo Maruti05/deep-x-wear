@@ -8,15 +8,23 @@ import { ShoppingCart, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getDiscountedPrice } from "@/lib/utils";
 import { useCart } from "@/app/context/CartContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useGlobalLoading } from "@/components/common/LoadingProvider";
+import { useUpdateCartItemsMutation } from "@/hooks/useCart";
 
 export function ProductContent({ product }: { product: ProductType }) {
   const navigate = useRouter();
   const { addToCart } = useCart();
   const { show, hide } = useGlobalLoading();
+  const [cartId, setCartId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCartId(localStorage.getItem("cart_id"));
+    }
+  }, []);
+  const updateItemsMutation = useUpdateCartItemsMutation(cartId ?? "unknown");
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]?.name ?? "");
   const [quantity, setQuantity] = useState(0);
@@ -30,59 +38,50 @@ export function ProductContent({ product }: { product: ProductType }) {
       return;
     }
 
-    const cartId = typeof window !== 'undefined' ? localStorage.getItem('cart_id') : null;
-    if (!cartId) {
-      toast.error('No cart found. Please login to create your cart.');
-      return;
-    }
 
-    const newItem = {
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      mainImageUrl: product.mainImageUrl,
-      size,
-      color,
-      quantity,
-      discount: product.discount,
-      calculatedPrice: product.calculatedPrice,
-      stockQuantity: product.stockQuantity,
-    };
+     if (!cartId) {
+       toast.error('No cart found. Please login to create your cart.');
+       return;
+     }
 
-    // Optimistic update
-    addToCart(newItem);
+     const newItem = {
+       productId: product.id,
+       name: product.name,
+       price: product.price,
+       mainImageUrl: product.mainImageUrl,
+       size,
+       color,
+       quantity,
+       discount: product.discount,
+       calculatedPrice: product.calculatedPrice,
+       stockQuantity: product.stockQuantity,
+     };
 
-    try {
-      setSyncing(true);
-      show();
-      const res = await fetch(`/api/cart/${cartId}/items`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [
-            {
-              product_id: product.id,
-              quantity,
-              size,
-              color,
-            },
-          ],
-        }),
-      });
+     // Optimistic update
+     addToCart(newItem);
+ 
+     try {
+       setSyncing(true);
+       show();
 
-      if (!res.ok) {
-        throw new Error('Failed to sync cart');
-      }
-
-      toast.success(`${product.name} added to cart!`, { duration: 3000 });
-      setIsAddToCartClicked(true);
-    } catch (err) {
-      console.error(err);
-      toast.error('Could not sync with backend.');
-    } finally {
-      setSyncing(false);
-      hide();
-    }
+      await updateItemsMutation.mutateAsync([
+        {
+          product_id: product.id,
+          quantity,
+          size,
+          color,
+        },
+      ]);
+ 
+       toast.success(`${product.name} added to cart!`, { duration: 3000 });
+       setIsAddToCartClicked(true);
+     } catch (err) {
+       console.error(err);
+       toast.error('Could not sync with backend.');
+     } finally {
+       setSyncing(false);
+       hide();
+     }
   };
 
   return (

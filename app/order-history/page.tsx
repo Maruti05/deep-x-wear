@@ -5,9 +5,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Package, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../context/AuthContext";
-import { useGlobalLoading } from "@/components/common/LoadingProvider";
+// import { useGlobalLoading } from "@/components/common/LoadingProvider";
 import { Badge } from "@/components/ui/badge";
-import useSWR from "swr";
+import { useQuery } from "@tanstack/react-query";
+import { getJSON } from "@/lib/http";
+import { QUERY_KEYS } from "@/lib/query-keys";
 
 // Types
 interface OrderItemProduct {
@@ -37,15 +39,6 @@ interface OrdersResponse {
   meta: { page: number; pageSize: number; total: number; totalPages: number };
   error?: string;
 }
-
-const fetcher = async (url: string): Promise<OrdersResponse> => {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(msg || `Failed to fetch: ${res.status}`);
-  }
-  return res.json();
-};
 
 // Status badge with extensible themes
 function OrderStatusBadge({ status }: { status?: string }) {
@@ -103,25 +96,26 @@ function OrderItemRow({ item }: { item: OrderItem }) {
 }
 
 export default function Page() {
-  const { show, hide } = useGlobalLoading();
+  // const { show, hide } = useGlobalLoading();
   const { user } = useAuth();
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
 
-  const { data, error, isLoading, mutate } = useSWR<OrdersResponse>(
-    user?.id ? `/api/orders/history?user_id=${user.id}&page=${page}&page_size=${pageSize}` : null,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      keepPreviousData: true as any,
-    }
-  );
+  const { data, error, isLoading, isFetching } = useQuery<OrdersResponse>({
+    queryKey: user?.id ? QUERY_KEYS.ordersHistory(user.id, page, pageSize) : ["orders-history-disabled"],
+    queryFn: () => getJSON(`/api/orders/history?user_id=${user!.id}&page=${page}&page_size=${pageSize}`, { emitGlobalEvents: false }),
+    enabled: Boolean(user?.id),
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    const shouldShow = isLoading && (!data || !Array.isArray(data.orders) || data.orders.length === 0);
-    if (shouldShow) show();
-    else hide();
-  }, [isLoading, data, show, hide]);
+  // Global loader is managed centrally; no manual show/hide here
+  // useEffect(() => {
+  //   const shouldShow = (isLoading || isFetching) && (!data || !Array.isArray(data.orders) || data.orders.length === 0);
+  //   if (shouldShow) show();
+  //   else hide();
+  // }, [isLoading, isFetching, data, show, hide]);
 
   const orders = data?.orders || [];
   const meta = data?.meta || { page, pageSize, total: 0, totalPages: 1 };

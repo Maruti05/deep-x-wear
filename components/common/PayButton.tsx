@@ -1,10 +1,20 @@
 "use client";
 
+// Augment the Window type to avoid 'any' assertions for Cashfree SDK
+declare global {
+  interface Window {
+    Cashfree?: (opts: { mode: "sandbox" | "production" }) => {
+      checkout: (opts: { paymentSessionId: string; returnUrl: string }) => Promise<void>;
+    };
+  }
+}
+
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
 import { useGlobalLoading } from "@/components/common/LoadingProvider";
+import { postJSON, JSONValue } from "@/lib/http";
 // removed: import { supabase } from "@/lib/supabase-browser";
 
 type CartItem = {
@@ -22,7 +32,7 @@ type CartItem = {
 interface PayButtonProps {
   cart: CartItem[];
   selectedItems: boolean[];
-  onOrderCreated?: (order: any) => void;
+  onOrderCreated?: (order: unknown) => void;
 }
 
 export default function PayButton({ cart, selectedItems, onOrderCreated }: PayButtonProps) {
@@ -32,7 +42,7 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
   const { show, hide } = useGlobalLoading();
 
   useEffect(() => {
-    if ((window as any).Cashfree) return setSdkLoaded(true);
+    if (window.Cashfree) return setSdkLoaded(true);
     const s = document.createElement("script");
     s.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
     s.async = true;
@@ -64,18 +74,18 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
       const subtotal = selectedCartItems.reduce((acc, item) => acc + item.calculatedPrice * item.quantity, 0);
 
       // Create order via secure API
-      const orderPayload = {
+      const orderPayload: JSONValue = {
         userId: authUser.id,
         items: selectedCartItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
-          size: item.size,
-          color: item.color,
+          size: item.size ?? null,
+          color: item.color ?? null,
           price: item.calculatedPrice,
           snapshot: {
             name: item.name,
             price: item.price,
-            discount: item.discount,
+            discount: item.discount ?? null,
           },
         })),
         subtotal,
@@ -83,59 +93,43 @@ export default function PayButton({ cart, selectedItems, onOrderCreated }: PayBu
         shipping: 0,
       };
 
-      const orderRes = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload),
-      });
-
-      if (!orderRes.ok) {
-        const err = await orderRes.json().catch(() => ({}));
-        throw new Error(err?.error || "Failed to create order.");
-      }
-      const { order } = await orderRes.json();
+      const orderRes = await postJSON("/api/orders", orderPayload);
+      const { order } = orderRes as { order?: { id: string; total: number } };
       if (!order?.id) throw new Error("Order creation failed.");
 
       onOrderCreated?.(order);
 
-      const res = await fetch("/api/payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          amount: order.total,
-          userData: {
-            id: authUser.id,
-            email: authUser.email,
-            phone: authUser.additionalData?.phone_number,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const errPayload = await res.json().catch(() => ({}));
-        throw new Error(errPayload?.error || "Failed to initialize payment");
-      }
-
-      const data = await res.json();
+      const paymentPayload: JSONValue = {
+        orderId: order.id,
+        amount: order.total,
+        userData: {
+          id: authUser.id,
+          email: authUser.email,
+          phone: authUser.additionalData?.phone_number ?? null,
+        },
+      };
+      const data = await postJSON("/api/payments", paymentPayload);
 
       if (data.payment_link) {
-        window.location.href = data.payment_link;
+        window.location.href = data.payment_link as string;
         return;
       }
 
       if (data.payment_session_id && sdkLoaded) {
-        const cashfree = (window as any).Cashfree({ mode: process.env.NODE_ENV === "production" ? "production" : "sandbox" });
+        const cashfreeFactory = window.Cashfree;
+        if (!cashfreeFactory) throw new Error("Payment SDK is not loaded");
+        const cashfree = cashfreeFactory({ mode: process.env.NODE_ENV === "production" ? "production" : "sandbox" });
         await cashfree.checkout({
-          paymentSessionId: data.payment_session_id,
+          paymentSessionId: data.payment_session_id as string,
           returnUrl: `${window.location.origin}/api/payments/return?order_id=${order.id}`,
         });
       } else {
         throw new Error("Payment session not ready. Please try again.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || "Payment failed. Please try again.");
+      const msg = err instanceof Error ? err.message : "Payment failed. Please try again.";
+      toast.error(msg);
     } finally {
       setLoading(false);
       hide();

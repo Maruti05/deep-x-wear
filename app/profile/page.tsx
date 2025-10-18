@@ -63,15 +63,7 @@ export default function Page() {
     },
   });
 
-  // ✅ Show loader while profile data is loading
-  useEffect(() => {
-    const shouldShow = isLoading && !user;
-    if (shouldShow) {
-      show();
-    } else {
-      hide();
-    }
-  }, [isLoading, user, show, hide]);
+  // Global loader is auto-managed by LoadingProvider; no manual gating needed.
 
   // ✅ Reset form when authUser changes
   useEffect(() => {

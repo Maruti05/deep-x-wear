@@ -11,6 +11,7 @@ import { AppToaster } from "@/components/ui/toaster";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import { CartRealtimeBridge } from "@/components/common/CartRealtimeBridge";
+import { ReactQueryProvider } from "@/lib/react-query";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,32 +30,34 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {" "}
-        <LoadingProvider>
-          <AuthProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              <CartProvider>
-                <ModalProvider>
-                  <AppToaster />
-                  <GlobalModalHost />
-                  {/* Mount realtime bridge to keep CartContext in sync with backend */}
-                  <CartRealtimeBridge />
-                  <div>
-                    <Header />
-                    {children}
-                    <Footer />
-                  </div>
-                </ModalProvider>
-              </CartProvider>
-            </ThemeProvider>
-          </AuthProvider>
-        </LoadingProvider>
+        <ReactQueryProvider>
+          <LoadingProvider>
+            <AuthProvider>
+              <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                <CartProvider>
+                  <ModalProvider>
+                    <AppToaster />
+                    <GlobalModalHost />
+                    {/* Mount realtime bridge to keep CartContext in sync with backend */}
+                    <CartRealtimeBridge />
+                    <div>
+                      <Header />
+                      <main className="min-h-screen flex flex-col pb-[12rem]">
+                        {children}
+                      </main>
+                      <Footer />
+                    </div>
+                  </ModalProvider>
+                </CartProvider>
+              </ThemeProvider>
+            </AuthProvider>
+          </LoadingProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );

@@ -33,7 +33,8 @@ export const LoadingBackdrop: React.FC<LoadingBackdropProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className={cn(
-            "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm",
+            // Allow pointer events to pass through so UI remains interactive
+            "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm pointer-events-none",
             className,
           )}
         >

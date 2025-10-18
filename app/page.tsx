@@ -10,18 +10,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function Home() {
-  const { show, hide } = useGlobalLoading();
-  const { refresh, isError, isLoading, products } = useProducts();
-
-  // Show global loader only while the initial list is loading and no data is yet available
-  useEffect(() => {
-    const shouldShow = isLoading && (!products || products.length === 0);
-    if (shouldShow) {
-      show();
-    } else {
-      hide();
-    }
-  }, [isLoading, products, show, hide]);
+  const { show } = useGlobalLoading();
+  const { isLoading, products } = useProducts();
 
   // Scroll reveal: observe elements with [data-reveal]
   useEffect(() => {
@@ -67,17 +57,17 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen px-2 pb-20 pt-4 sm:px-8 sm:pt-12 font-[family-name:var(--font-geist-sans)]">
+    <div className="min-h-screen px-2 pb-20 pt-4 sm:px-8 sm:pt-12">
       {products && trendyImages.length > 0 && (
         <ResponsiveCarouselWithDots items={trendyImages} />
       )}
       {(!products || products.length === 0) && isLoading ? (
         renderSkeletonGrid()
       ) : (
-        <div className="container mx-auto mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Product list: max height with custom scrollbar */}
-          <section className="lg:col-span-2">
-            <ScrollArea className="max-h-[72vh] rounded-md border">
+        <div className="container mx-auto mt-4 flex flex-col gap-6">
+          {/* Product list */}
+          <section>
+            <ScrollArea className="rounded-md border">
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-[8px] sm:gap-4 lg:gap-6 p-2">
                 {products &&
                   products.map((item: ProductType, idx: number) => (
@@ -94,19 +84,19 @@ export default function Home() {
             </ScrollArea>
           </section>
 
-          {/* Modern product suggestions with smooth animations */}
-          <aside className="space-y-4">
+          {/* Suggested for you at bottom */}
+          <section className="space-y-4" aria-label="Suggested for you">
             <h3 className="text-lg font-semibold">Suggested for you</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(products || []).slice(0, 6).map((item: ProductType, i) => (
                 <motion.div
-                  key={`sugg-${item.id}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
-                  className="rounded-md border p-2 hover:shadow-sm bg-background"
-                >
+                key={`sugg-${item.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.35, delay: Math.min(i, 8) * 0.05 }}
+                    className="rounded-md border p-2 hover:shadow-sm bg-background"
+                  >
                   <Link
                     href={{ pathname: `/${item.id}`, query: { data: JSON.stringify(item) } }}
                     prefetch
@@ -134,7 +124,7 @@ export default function Home() {
                 </motion.div>
               ))}
             </div>
-          </aside>
+          </section>
         </div>
       )}
     </div>

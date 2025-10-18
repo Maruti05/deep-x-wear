@@ -3,13 +3,12 @@ import { useCart } from "@/app/context/CartContext";
 import {
   Trash2,
   ShoppingCart,
-  PackageCheck,
   ReceiptText,
   Minus,
   Plus,
   HandCoins,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Dialog,
@@ -28,15 +27,36 @@ import { Badge } from "../ui/badge";
 import { useAuth } from "@/app/context/AuthContext";
 import Banner from "./CheckoutBanner";
 import { useModal } from "@/app/context/ModalContext";
-import { supabase } from "../admin/ProductForm";
 import PayButton from "../common/PayButton";
 import { useGlobalLoading } from "@/components/common/LoadingProvider";
+import { useUpdateCartItemsMutation, useDeleteCartItemMutation } from "@/hooks/useCart";
+import { getJSON } from "@/lib/http";
+
+// Define minimal types for server cart response to avoid 'any'
+type ServerCartItem = {
+  product_id: string;
+  size?: string;
+  color?: string;
+  item_id: string;
+};
+
+type ServerCartResponse = {
+  items: ServerCartItem[];
+};
 
 export default function CartView() {
   const { openModal } = useModal();
   const { user: authUser } = useAuth();
   const { cart, updateCartItem, removeFromCart, clearCart } = useCart();
   const { show, hide } = useGlobalLoading();
+  const [cartId, setCartId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCartId(localStorage.getItem("cart_id"));
+    }
+  }, []);
+  const updateItemsMutation = useUpdateCartItemsMutation(cartId ?? "unknown");
+  const deleteItemMutation = useDeleteCartItemMutation(cartId ?? "unknown");
   const [selectedItems, setSelectedItems] = useState<boolean[]>(
     cart.map(() => true)
   );
@@ -56,168 +76,72 @@ export default function CartView() {
       ? acc + parseFloat(item.price) * item.quantity
       : acc;
   }, 0);
-  const isDisabled =
-    afterDiscAmount === 0 ||
-    cart.length === 0 ||
-    !authUser?.isLoginnedIn ||
-    !authUser.isProfileCompleted;
 
   const syncQuantity = async (index: number, newQty: number) => {
-    const cartId = typeof window !== 'undefined' ? localStorage.getItem('cart_id') : null;
-    if (!cartId) return;
+    if (!cartId) return; // guard when cart id not ready
     const item = cart[index];
+    const previousQty = item.quantity;
     try {
       show();
-      const res = await fetch(`/api/cart/${cartId}/items`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [
-            {
-              product_id: item.productId,
-              quantity: newQty,
-              size: item.size,
-              color: item.color,
-            },
-          ],
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to update quantity');
+      await updateItemsMutation.mutateAsync([
+        {
+          product_id: item.productId,
+          quantity: newQty,
+          size: item.size,
+          color: item.color,
+        },
+      ]);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to sync quantity');
+      // rollback optimistic change
+      updateCartItem(index, { quantity: previousQty });
+      toast.error("Failed to sync quantity");
     } finally {
       hide();
     }
   };
 
   const syncRemove = async (index: number) => {
-    const cartId = typeof window !== 'undefined' ? localStorage.getItem('cart_id') : null;
-    if (!cartId) return;
+    if (!cartId) return; // guard when cart id not ready
     const item = cart[index];
-    let backendItemId = (item as any).backendItemId as string | undefined;
+    let backendItemId = (item as { backendItemId?: string }).backendItemId;
 
     // Fallback: if we don't have backendItemId locally, fetch cart and resolve
     if (!backendItemId) {
       try {
-        const res = await fetch(`/api/cart/${cartId}`);
-        if (res.ok) {
-          const data = await res.json();
-          const matched = Array.isArray(data.items)
-            ? data.items.find((it: any) =>
+        const data = await getJSON<ServerCartResponse>(`/api/cart/${cartId}`);
+        const matched = Array.isArray(data.items)
+          ? data.items.find(
+              (it) =>
                 it.product_id === item.productId &&
                 it.size === item.size &&
                 it.color === item.color
-              )
-            : null;
-          backendItemId = matched?.item_id;
-        }
+            )
+          : undefined;
+        backendItemId = matched?.item_id;
       } catch (e) {
-        console.error('Failed to refetch cart for item removal', e);
+        console.error("Failed to refetch cart for item removal", e);
       }
       if (!backendItemId) {
-        toast.error('Unable to locate item on server for removal');
+        toast.error("Unable to locate item on server for removal");
         return;
       }
     }
 
     try {
       show();
-      const res = await fetch(`/api/cart/${cartId}/items/${backendItemId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to remove item');
+      await deleteItemMutation.mutateAsync(backendItemId);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to remove from backend');
+      toast.error("Failed to remove from backend");
     } finally {
       hide();
     }
   };
 
-  // const handleClick = useCallback(
-
-  //   (e: React.MouseEvent) => {
-  //     if (isDisabled) {
-  //       e.preventDefault(); // 🛑 prevent link navigation
-  //       e.stopPropagation();
-  //     }else{
-  //       openModal("payment-confirm");
-  //     }
-  //   },
-  //   [isDisabled]
-  // );
-  const onClickPlaceOrder = async () => {
-    if (isDisabled) return;
-
-    try {
-      show();
-
-      // build order items payload
-      const selectedCartItems = cart.filter((_, i) => selectedItems[i]);
-
-      const subtotal = selectedCartItems.reduce(
-        (acc, item) => acc + item.calculatedPrice * item.quantity,
-        0
-      );
-
-      // Step 1: Insert Order
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          user_id: authUser.id,
-          order_number: `ORD-${Date.now()}`, // simple unique order number
-          subtotal,
-          total: subtotal, // add tax/shipping if needed
-          status: "pending",
-          payment_status: "pending",
-          notes: null,
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error(orderError);
-        toast.error("Failed to place order.");
-        return;
-      }
-
-      // Step 2: Insert Order Items
-      const orderItemsPayload = selectedCartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-        price: item.calculatedPrice,
-        product_snapshot: {
-          name: item.name,
-          price: item.price,
-          discount: item.discount,
-        },
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItemsPayload);
-
-      if (itemsError) {
-        console.error(itemsError);
-        toast.error("Failed to add order items.");
-        return;
-      }
-
-      // ✅ Step 3: Open Payment Confirmation modal
-      openModal("payment-confirm", { order }); // pass order to modal
-      toast.success("Order created, please confirm payment.");
-    } catch (err) {
-      console.error(err);
-      toast.error("Something went wrong while placing the order.");
-    } finally {
-      hide();
-    }
-  };
   return (
     <div
-      className={`grid gap-6 p-4 h-auto] ${
+      className={`grid gap-6 p-4 h-auto ${
         cart.length > 0 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
       }`}
     >
@@ -408,24 +332,7 @@ export default function CartView() {
               onClick={() => openModal("login")}
             />
           )}
-          {/* <Link
-            href={{
-              pathname: "/payment",
-              query: { amount: afterDiscAmount.toFixed(2) },
-            }}
-            onClick={handleClick}
-          > */}
-            {/* <Button
-              className="mt-6 w-full flex items-center gap-2"
-              disabled={isDisabled}
-               onClick={onClickPlaceOrder}
-            >
-              <PackageCheck className="w-4 h-4" />
-              Place Order
-            </Button> */}
-           <PayButton cart={cart.map(item => ({ ...item, price: Number(item.price) }))} selectedItems={selectedItems} />
-
-          {/* </Link> */}
+          <PayButton cart={cart.map(item => ({ ...item, price: Number(item.price) }))} selectedItems={selectedItems} />
         </div>
       )}
     </div>

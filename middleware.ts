@@ -15,13 +15,17 @@ export async function middleware(req: NextRequest) {
 
   const res = NextResponse.next();
 
+  // Refresh Supabase session cookies for all routes
+  const supabase = createMiddlewareClient({ req, res });
+  await supabase.auth.getSession();
+
   // Issue CSRF token cookie (double-submit token) for all routes if missing
   const csrfCookie = req.cookies.get("csrf_token")?.value;
   if (!csrfCookie) {
     const token = crypto.randomUUID();
     res.cookies.set("csrf_token", token, {
       httpOnly: false,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24, // 1 day
